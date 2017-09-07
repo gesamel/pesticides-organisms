@@ -1,0 +1,46 @@
+---
+title: "Untitled"
+author: "AS"
+date: "September 7, 2017"
+output: html_document
+---
+
+## Setup
+
+Load the following packages and load the data base access scipt
+
+```{r setup}
+## load packages
+require(RPostgreSQL)
+require(sf)
+require(knitr)
+
+## load access data
+source('Rmd/R/amelung_access.R')
+```
+
+## Loading data
+
+Here you find the code necessary to query our PostgresSQL data base: bfg_monitoring
+
+```{r load-data}
+drv = dbDriver("PostgreSQL")
+con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+dat = dbGetQuery(con, "SELECT *
+                       FROM mzb.mzb_samples
+                       WHERE site_id = 'NW_13067'
+                       LIMIT 100")
+
+dbDisconnect(con)
+dbUnloadDriver(drv)
+```
+
+## Plot a histogram of the measured variable
+
+Ploting a histogram from the just queried data.
+
+```{r histogram}
+hist(dat$ind_qm)
+```
+
