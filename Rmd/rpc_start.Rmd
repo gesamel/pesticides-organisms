@@ -7,23 +7,24 @@ output: html_document
 
 ## Setup
 
-Load the following packages and load the data base access scipt
+Load the following packages and load the data base access scipt:
 
-```{r setup}
+```{r setup, echo=TRUE, message=FALSE}
 ## load packages
 require(RPostgreSQL)
 require(sf)
 require(knitr)
 
 ## load access data
-source('Rmd/R/amelung_access.R')
+prjdir = '/home/andreas/Documents/Projects/pesticides-organisms'
+source(file.path(prjdir, 'Rmd/R/amelung_access.R'))
 ```
 
 ## Loading data
 
 Here you find the code necessary to query our PostgresSQL data base: bfg_monitoring
 
-```{r load-data}
+```{r load-data, echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
 
@@ -41,6 +42,6 @@ dbUnloadDriver(drv)
 Ploting a histogram from the just queried data.
 
 ```{r histogram}
-hist(dat$ind_qm)
+hist(log10(dat$ind_qm))
 ```
 
