@@ -2,12 +2,15 @@
 title: "Untitled"
 author: "AS"
 date: "September 7, 2017"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
-
+ 
 ## Setup
 
 Load the following packages and load the data base access scipt:
+
 
 ```{r setup, echo=TRUE, message=FALSE}
 ## load packages
@@ -24,7 +27,7 @@ source(file.path(prjdir, 'Rmd/R/amelung_access.R'))
 
 Here you find the code necessary to query our PostgresSQL data base: bfg_monitoring
 
-```{r load-data, echo=TRUE, message=FALSE}
+```{r load-MZB-data, echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
 
@@ -36,6 +39,22 @@ dat = dbGetQuery(con, "SELECT *
 dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
+
+```{r load-PSM-data, echo=TRUE, message=FALSE}
+drv = dbDriver("PostgreSQL")
+con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+psm_sites = dbGetQuery(con, "SELECT *
+                             FROM views.psm_sites_2005")
+psm_samples = dbGetQuery(con, "SELECT *
+                               FROM views.psm_samples_2005 sam
+                               JOIN phch.phch_variables var ON var.variable_id = sam.variable_id")
+
+dbDisconnect(con)
+dbUnloadDriver(drv)
+```
+
+
 
 ## Plot a histogram of the measured variable
 
