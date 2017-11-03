@@ -25,7 +25,7 @@ We do not have strong guideline for our contributions and are happy to help.
 
 ### Questions?
 
-Get in touch: [Mira Kattwinkel](mailto:scharmueller@uni-landau.de)
+Get in touch: [Andreas Scharmüller](mailto:scharmueller@uni-landau.de)
 
 ### Thanks for contributing!
 
