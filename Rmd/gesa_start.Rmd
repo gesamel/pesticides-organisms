@@ -78,3 +78,21 @@ dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
 
+## Combine both sample tables
+
+Combine table psm_samples mit dia_samples über die Spalte "date".
+Not very useful but keep code anyways.
+
+```{r load-PSM-data, echo=TRUE, message=FALSE}
+drv = dbDriver("PostgreSQL")
+con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+sam_tab = dbGetQuery(con, " SELECT * 
+                      FROM dia.dia_samples AS dsam
+                      INNER JOIN views.psm_samples_2005 AS psam
+                      ON dsam.date = psam.date
+                      LIMIT 100")
+
+dbDisconnect(con)
+dbUnloadDriver(drv)
+```
