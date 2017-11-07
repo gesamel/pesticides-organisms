@@ -43,6 +43,7 @@ psm_samples = dbGetQuery(con, "SELECT *
 dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
+
 ```{r load-PSM-data, echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
@@ -59,3 +60,21 @@ mapview(dia_sites_geo)
 dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
+
+## Get  diatom samples sampled after 2004
+
+There are diatom samples from 2004 in the database. For the PSM data, no samples of 2004 are in the database. Therefore, data doesn't need to be queried specifically.
+
+```{r load-PSM-data, echo=TRUE, message=FALSE}
+drv = dbDriver("PostgreSQL")
+con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+dia_2005 = dbGetQuery(con, "SELECT *
+                       FROM dia.dia_samples
+                       WHERE date > '2004-12-31'
+                       LIMIT 100")
+
+dbDisconnect(con)
+dbUnloadDriver(drv)
+```
+
