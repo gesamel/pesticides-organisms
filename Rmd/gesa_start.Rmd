@@ -1,0 +1,61 @@
+---
+title: "Untitled"
+author: "Gesa Amelung"
+date: "7 November 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Setup
+
+Load the following packages and load the data base access scipt:
+
+```{r setup, echo=TRUE, message=FALSE}
+## load packages
+require(RPostgreSQL)
+require(sf)
+require(knitr)
+
+## load access data
+path = 'D:/Gesa/Dokumente/Ecotoxicology/RPC'
+source(file.path(path, 'amelung_access.R'))
+
+```
+
+## Loading data
+
+Query PostgresSQL data base: bfg_monitoring
+Cannot load full psm_samples so far, maybe internet is too weak..
+
+```{r load-PSM-data, echo=TRUE, message=FALSE}
+drv = dbDriver("PostgreSQL")
+con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+psm_sites = dbGetQuery(con, "SELECT *
+                             FROM views.psm_sites_2005")
+psm_samples = dbGetQuery(con, "SELECT *
+                               FROM views.psm_samples_2005 sam
+                               JOIN phch.phch_variables var ON var.variable_id = sam.variable_id LIMIT 10")
+
+dbDisconnect(con)
+dbUnloadDriver(drv)
+```
+```{r load-PSM-data, echo=TRUE, message=FALSE}
+drv = dbDriver("PostgreSQL")
+con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+require(RPostgreSQL)
+require(sf)
+require(mapview)
+
+dia_sites = dbGetQuery(con, "SELECT * FROM dia.dia_sites LIMIT 10")
+dia_sites_geo = st_read_db(con, query = "SELECT * FROM dia.dia_sites LIMIT 10")
+dia_sam = dbGetQuery(con, "SELECT * FROM dia.dia_samples LIMIT 10")
+mapview(dia_sites_geo)
+
+dbDisconnect(con)
+dbUnloadDriver(drv)
+```
