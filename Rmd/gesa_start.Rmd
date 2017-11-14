@@ -173,6 +173,7 @@ samples_bind <- rbind(dia_sam_bind,psm_sam_bind) # combine both sample tables
 
 ```
 
+Create data frames with samples only from 2005.
 ``` {r create-year-column, echo=TRUE, message=FALSE}
 # Create year column from date column
 dia_sam$year <- as.numeric(format(dia_sam$date,'%Y'))
@@ -181,4 +182,7 @@ psm_samples$year <- as.numeric(format(psm_samples$date,'%Y'))
 # Create data frames with samples only from 2005
 dia_sam_05 <- dia_sam[dia_sam$year=="2005",]
 psm_sam_05 <- psm_samples[psm_samples$year=="2005",]
+
+# common <- intersect(dia_sam_05[,"site_id"], psm_sam_05[,"site_id"]) # results in empty data
+
 ```
