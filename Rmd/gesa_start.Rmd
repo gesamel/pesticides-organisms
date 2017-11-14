@@ -28,7 +28,7 @@ source(file.path(path, 'amelung_access.R'))
 ## Loading data
 
 Query PostgresSQL data base: bfg_monitoring
-Cannot load full psm_samples so far, maybe internet is too weak..
+Cannot load full psm_samples so far, maybe internet is too weak.. Set LIMIT 100
 
 ```{r load-PSM-data, echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
@@ -36,10 +36,10 @@ con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBpor
 
 psm_sites = dbGetQuery(con, "SELECT *
                              FROM views.psm_sites_2005
-                       LIMIT 10")
+                       ")
 psm_samples = dbGetQuery(con, "SELECT *
                                FROM views.psm_samples_2005 sam
-                               JOIN phch.phch_variables var ON var.variable_id = sam.variable_id LIMIT 10")
+                               JOIN phch.phch_variables var ON var.variable_id = sam.variable_id LIMIT 1000")
 
 dbDisconnect(con)
 dbUnloadDriver(drv)
@@ -53,9 +53,9 @@ require(RPostgreSQL)
 require(sf)
 require(mapview)
 
-dia_sites = dbGetQuery(con, "SELECT * FROM dia.dia_sites LIMIT 10")
+dia_sites = dbGetQuery(con, "SELECT * FROM dia.dia_sites")
 dia_sites_geo = st_read_db(con, query = "SELECT * FROM dia.dia_sites LIMIT 10")
-dia_sam = dbGetQuery(con, "SELECT * FROM dia.dia_samples LIMIT 10")
+dia_sam = dbGetQuery(con, "SELECT * FROM dia.dia_samples LIMIT 100")
 mapview(dia_sites_geo)
 
 dbDisconnect(con)
@@ -73,7 +73,7 @@ con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBpor
 dia_sam_05 = dbGetQuery(con, "SELECT *
                        FROM dia.dia_samples
                        WHERE date > '2004-12-31'
-                       LIMIT 100")
+                       ")
 
 dbDisconnect(con)
 dbUnloadDriver(drv)
@@ -97,31 +97,27 @@ sam_tab = dbGetQuery(con, " SELECT *
 dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
-```{r load-PSM-data, echo=TRUE, message=FALSE}
-drv = dbDriver("PostgreSQL")
-con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
-
-sam_tab = dbGetQuery(con, " SELECT *
-                     FROM LIMIT 100")
-
-dbDisconnect(con)
-dbUnloadDriver(drv)
-```
 
 ## Question: How to compare diatom and psm sampling sites?
 Where were samples taken at the same location?
 
-Random check if site_id exists in dia_2005.
+Random check if site_id exists in dia_sam_05.
 Result: site_id is not the same in psm_samples and dia_sam_05.
+Maybe labelling system is still the same, samples were just not always taken at same location?
 ```{r}
-dia_sam_05[dia_2005$site_id=="BW_10001",] #no result
-dia_sam_05[dia_2005$site_id=="BW_AI025.00",] #high output
+# Random site_id taken from psm_samples
+dia_sam_05[dia_sam_05$site_id=="BW_10001",] #no result
+dia_sam_05[dia_sam_05$site_id=="RP_10002",] #no results
+# Random site_id taken from dia_samples as a cross-check if code is correct.
+dia_sam_05[dia_sam_05$site_id=="BW_AI025.00",] #185 results
+
 ```
-Is site_name, site_id and site_nr the same? 
+Is site_name, site_id and site_nr the same in psm_sites dataset? 
 Find out by counting distinct occurence of them.
 Result: site_id and site_name does not mean the same.
 Site_id and site_nr might be approximately the same.
 ``` {r}
+# Complete data set has to be queried before!!
 psm_siteid_list <- unique(psm_sites$site_id)
 nrow(as.data.frame(psm_siteid_list)) # 3116 different entries for site_id in psm_sites
 
@@ -133,4 +129,29 @@ nrow(as.data.frame(psm_sitenr_list)) # 3114 different entries for site_nr in psm
 
 ```
 
+Random check if site_nr in dia_sites and psm_sites are the same.
+Result: site_nr in psm_sites and dia_sites are not the same.
+Maybe labelling system is still the same, samples were just not always taken at same location?
+Check the other way around. Are site_nr of dia_sites found in psm_sites?
+Result: Positive. Dia samples were probably not taken at all psm sampling locations.
+```{r}
+# Random site_nr taken from psm_sites
+dia_sites[dia_sites$site_nr=="CAC029",] # no results
+dia_sites[dia_sites$site_nr=="21094",] # no results
+dia_sites[dia_sites$site_nr=="CEN901",] # no results
+# Random site_nr taken from dia_sites as a cross-check to see if code is correct.
+dia_sites[dia_sites$site_nr=="CEZ016",] # 1 result
 
+# Check the other way around. Are site_nr of dia_sites found in psm_sites?
+psm_sites[psm_sites$site_nr=="CEZ016",] # 1 result 
+psm_sites[psm_sites$site_nr=="CKO317",] # 1 result
+```
+
+Random check if site_id in dia_sites and psm_sites are the same.
+Result: Yes.
+``` {r}
+psm_sites[psm_sites$site_id=="BW_CEZ016",] # 1 result
+psm_sites[psm_sites$site_id=="BW_CKO317",] # 1 result
+
+```
+site_id can be used to connect psm_sites and dia_sites since attribut it is found in both tables.
