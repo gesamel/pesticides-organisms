@@ -37,7 +37,9 @@ psm_sites = dbGetQuery(con, "SELECT *
                        ")
 psm_samples = dbGetQuery(con, "SELECT *
                                FROM views.psm_samples_2005 sam
-                               JOIN phch.phch_variables var ON var.variable_id = sam.variable_id LIMIT 1000")
+                               JOIN phch.phch_variables var 
+                              ON var.variable_id = sam.variable_id 
+                               LIMIT 1000")
 
 dbDisconnect(con)
 dbUnloadDriver(drv)
@@ -82,7 +84,7 @@ dbUnloadDriver(drv)
 Combine table psm_samples mit dia_samples über die Spalte "date".
 Not very useful but keep code anyways.
 
-```{r echo=TRUE, message=FALSE}
+```{r combine-sample-datasets, echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
 
@@ -185,4 +187,24 @@ psm_sam_05 <- psm_samples[psm_samples$year=="2005",]
 
 # common <- intersect(dia_sam_05[,"site_id"], psm_sam_05[,"site_id"]) # results in empty data
 
+```
+Want to only use ta from 2005. Function not correct yet.
+```{r  join-on-siteid, echo=TRUE, message=FALSE}
+drv = dbDriver("PostgreSQL")
+con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+sam_tab = dbGetQuery(con, " SELECT * 
+                     FROM dia.dia_samples AS dsam
+                     INNER JOIN views.psm_samples_2005 AS psam 
+                     ON dsam.site_id = psam.site_id
+                    LIMIT 100")
+
+# WHERE
+ #                   (FROM dsam.date LIKE '2005%')
+  #                  AND 
+   #                 (FROM psam.date LIKE '2005%'                    
+
+          
+dbDisconnect(con)
+dbUnloadDriver(drv)
 ```
