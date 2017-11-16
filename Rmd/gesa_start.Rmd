@@ -252,6 +252,25 @@ sam_2join = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date
                     AND (dsam.date = psam.date)
                     ")
 
+sam_2join1 = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date, 
+                      EXTRACT(YEAR FROM dsam.date) AS sam_year,
+                     EXTRACT(YEAR FROM psam.date) AS psm_year
+                     FROM dia.dia_samples AS dsam
+                     INNER JOIN views.psm_samples_2005 AS psam 
+                     ON (dsam.site_id = psam.site_id)
+                    AND (dsam.date = psam.date)
+                    LIMIT 100")
+
+# ERROR: sam_year does not exist
+sam_2join2 = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date, 
+                      EXTRACT(YEAR FROM dsam.date) AS sam_year,
+                     EXTRACT(YEAR FROM psam.date) AS psm_year
+                     FROM dia.dia_samples AS dsam
+                     INNER JOIN views.psm_samples_2005 AS psam 
+                     ON (dsam.site_id = psam.site_id)
+                    AND (dsam.date = psam.date)
+                    LIMIT 100")
+
 
 # sam_tab1 = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date, 
 #                    EXTRACT(YEAR FROM dsam.date) AS sam_year,
