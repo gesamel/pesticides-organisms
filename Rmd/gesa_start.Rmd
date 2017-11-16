@@ -101,6 +101,7 @@ dbUnloadDriver(drv)
 ## Question: How to compare diatom and psm sampling sites?
 Where were samples taken at the same location?
 
+Which column should I use to compare both datasets?
 Random check if site_id exists in dia_sam.
 Result: site_id is not the same in psm_samples and dia_sam.
 Maybe labelling system is still the same, samples were just not always taken at same location?
@@ -188,23 +189,102 @@ psm_sam_05 <- psm_samples[psm_samples$year=="2005",]
 # common <- intersect(dia_sam_05[,"site_id"], psm_sam_05[,"site_id"]) # results in empty data
 
 ```
-Want to only use ta from 2005. Function not correct yet.
+Want to compare tables on year and site_id:
+Code is not appropriate yet.
 ```{r  join-on-siteid, echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
 
-sam_tab = dbGetQuery(con, " SELECT * 
+sam_tab = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date, 
+                    EXTRACT(YEAR FROM dsam.date) AS sam_year,
+                    EXTRACT(YEAR FROM psam.date) AS psm_year
                      FROM dia.dia_samples AS dsam
                      INNER JOIN views.psm_samples_2005 AS psam 
                      ON dsam.site_id = psam.site_id
-                    LIMIT 100")
+                    LIMIT 100");
 
-# WHERE
- #                   (FROM dsam.date LIKE '2005%')
-  #                  AND 
-   #                 (FROM psam.date LIKE '2005%'                    
+date_tab = dbGetQuery(con, " SELECT dsam.site_id, dsam.date
+                     FROM dia.dia_samples AS dsam
+                    WHERE dsam.date BETWEEN '2005-01-01' AND '2005-12-31'
+                     ")
 
-          
+sam_tab1 = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date 
+                     FROM dia.dia_samples AS dsam
+                     INNER JOIN views.psm_samples_2005 AS psam 
+                     ON dsam.site_id = psam.site_id
+                    WHERE (dsam.date BETWEEN '2005-01-01' AND '2005-12-31')
+                     AND (psam.date BETWEEN '2005-01-01' AND '2005-12-31')
+                    ")
+
+# Horrible style but at least it works...
+sam_tab2 = dbGetQuery(con, " SELECT dsam.site_id, dsam.date AS d_date, psam.date AS p_date 
+                     FROM dia.dia_samples AS dsam
+                     INNER JOIN views.psm_samples_2005 AS psam 
+                     ON dsam.site_id = psam.site_id
+                    WHERE ((dsam.date BETWEEN '2005-01-01' AND '2005-12-31')
+                     AND (psam.date BETWEEN '2005-01-01' AND '2005-12-31'))
+                    OR ((dsam.date BETWEEN '2006-01-01' AND '2005-12-31')
+                     AND (psam.date BETWEEN '2006-01-01' AND '2005-12-31'))
+                    OR ((dsam.date BETWEEN '2007-01-01' AND '2005-12-31')
+                     AND (psam.date BETWEEN '2007-01-01' AND '2005-12-31'))
+                    OR ((dsam.date BETWEEN '2008-01-01' AND '2005-12-31')
+                     AND (psam.date BETWEEN '2008-01-01' AND '2005-12-31'))
+                    OR ((dsam.date BETWEEN '2009-01-01' AND '2005-12-31')
+                     AND (psam.date BETWEEN '2009-01-01' AND '2005-12-31'))
+                     OR ((dsam.date BETWEEN '2010-01-01' AND '2005-12-31')
+                     AND (psam.date BETWEEN '2010-01-01' AND '2005-12-31'))
+                     OR ((dsam.date BETWEEN '2011-01-01' AND '2005-12-31')
+                     AND (psam.date BETWEEN '2011-01-01' AND '2005-12-31'))
+                     OR ((dsam.date BETWEEN '2012-01-01' AND '2005-12-31')
+                     AND (psam.date BETWEEN '2012-01-01' AND '2005-12-31'))
+                     OR ((dsam.date BETWEEN '2013-01-01' AND '2005-12-31')
+                     AND (psam.date BETWEEN '2013-01-01' AND '2005-12-31'))
+                     OR ((dsam.date BETWEEN '2014-01-01' AND '2005-12-31')
+                     AND (psam.date BETWEEN '2014-01-01' AND '2005-12-31'))
+                     OR ((dsam.date BETWEEN '2015-01-01' AND '2005-12-31')
+                     AND (psam.date BETWEEN '2015-01-01' AND '2005-12-31'))
+                    LIMIT 1000")
+
+sam_2join = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date 
+                     FROM dia.dia_samples AS dsam
+                     INNER JOIN views.psm_samples_2005 AS psam 
+                     ON (dsam.site_id = psam.site_id)
+                    AND (dsam.date = psam.date)
+                    ")
+
+
+# sam_tab1 = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date, 
+#                    EXTRACT(YEAR FROM dsam.date) AS sam_year,
+#                    EXTRACT(YEAR FROM psam.date) AS psm_year
+#                     FROM dia.dia_samples AS dsam
+#                     INNER JOIN views.psm_samples_2005 AS psam 
+#                     ON dsam.site_id = psam.site_id
+#                    WHERE sam_year LIKE '2006'
+#                    LIMIT 100");
+
+
+# All queries don't work:
+
+# sam_tab2 = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date, 
+#                    EXTRACT(YEAR FROM dsam.date) AS sam_year,
+#                    EXTRACT(YEAR FROM psam.date) AS psm_year
+#                     FROM dia.dia_samples AS dsam
+#                     INNER JOIN views.psm_samples_2005 AS psam 
+#                     ON dsam.sam_year = psam.psm.year
+#                    LIMIT 100");
+
+
+# sam_tab2 = dbGetQuery(con, "SELECT site_id, sam_year, psm_year
+#       FROM sam_tab AS tab1
+#       INNER JOIN AS tab2
+#       ON tab1.sam_year = tab2.psm_year")
+
+# sqldf("SELECT site_id, sam_year, psm_year
+#       FROM sam_tab AS tab1
+#       INNER JOIN AS tab2
+#       ON tab1.sam_year = tab2.psm_year")
+
+         
 dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
