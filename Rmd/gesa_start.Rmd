@@ -79,25 +79,6 @@ dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
 
-## Combine both sample tables
-
-Combine table psm_samples mit dia_samples über die Spalte "date".
-Not very useful but keep code anyways.
-
-```{r combine-sample-datasets, echo=TRUE, message=FALSE}
-drv = dbDriver("PostgreSQL")
-con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
-
-sam_tab = dbGetQuery(con, " SELECT * 
-                      FROM dia.dia_samples AS dsam
-                      INNER JOIN views.psm_samples_2005 AS psam
-                      ON dsam.date = psam.date
-                      LIMIT 100")
-
-dbDisconnect(con)
-dbUnloadDriver(drv)
-```
-
 ## Question: How to compare diatom and psm sampling sites?
 Where were samples taken at the same location?
 
@@ -165,14 +146,14 @@ dia_sites[dia_sites$site_id=="BW_AI025.00",] # 1 result
 ```
 
 ## Compare both sample datasets
+Filter sites where diatom and herbicide data was measured in the same year.
 ``` {r compare-sample-datasets, echo=TRUE, message=FALSE}
-# Join both sample data frames. Add a column identifying whichn source each row comes from.
+# Join both sample data frames. Add a column identifying which source each row comes from.
 dia_sam$table <- "dia"
 psm_samples$table <- "psm"
 dia_sam_bind <- dia_sam[,c("date", "site_id", "table")]
 psm_sam_bind <- psm_samples[,c("date", "site_id", "table")]
 samples_bind <- rbind(dia_sam_bind,psm_sam_bind) # combine both sample tables
-# dupRows <- dupsBetweenGroups(samples_bind, "table") #cannot find function
 
 ```
 
@@ -190,6 +171,7 @@ psm_sam_05 <- psm_samples[psm_samples$year=="2005",]
 
 ```
 Want to compare tables on year and site_id:
+Include only herbicide data
 Code is not appropriate yet.
 ```{r  join-on-siteid, echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
@@ -217,33 +199,38 @@ sam_tab1 = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date
                     ")
 
 # Horrible style but at least it works...
-sam_tab2 = dbGetQuery(con, " SELECT dsam.site_id, dsam.date AS d_date, psam.date AS p_date 
+dia_herb_year = dbGetQuery(con, " SELECT dsam.site_id, dsam.date AS d_date, 
+                     psam.date AS p_date
                      FROM dia.dia_samples AS dsam
                      INNER JOIN views.psm_samples_2005 AS psam 
                      ON dsam.site_id = psam.site_id
-                    WHERE ((dsam.date BETWEEN '2005-01-01' AND '2005-12-31')
-                     AND (psam.date BETWEEN '2005-01-01' AND '2005-12-31'))
-                    OR ((dsam.date BETWEEN '2006-01-01' AND '2005-12-31')
-                     AND (psam.date BETWEEN '2006-01-01' AND '2005-12-31'))
-                    OR ((dsam.date BETWEEN '2007-01-01' AND '2005-12-31')
-                     AND (psam.date BETWEEN '2007-01-01' AND '2005-12-31'))
-                    OR ((dsam.date BETWEEN '2008-01-01' AND '2005-12-31')
-                     AND (psam.date BETWEEN '2008-01-01' AND '2005-12-31'))
-                    OR ((dsam.date BETWEEN '2009-01-01' AND '2005-12-31')
-                     AND (psam.date BETWEEN '2009-01-01' AND '2005-12-31'))
+                     JOIN phch.phch_variables AS var 
+                      ON var.variable_id = psam.variable_id
+                    WHERE var.psm_type = 'herbicide'
+                     AND   (((dsam.date BETWEEN '2005-01-01' AND '2005-12-31')
+                           AND (psam.date BETWEEN '2005-01-01' AND '2005-12-31'))
+                     OR ((dsam.date BETWEEN '2006-01-01' AND '2005-12-31')
+                           AND (psam.date BETWEEN '2006-01-01' AND '2005-12-31'))
+                     OR ((dsam.date BETWEEN '2007-01-01' AND '2005-12-31')
+                           AND (psam.date BETWEEN '2007-01-01' AND '2005-12-31'))
+                     OR ((dsam.date BETWEEN '2008-01-01' AND '2005-12-31')
+                           AND (psam.date BETWEEN '2008-01-01' AND '2005-12-31'))
+                     OR ((dsam.date BETWEEN '2009-01-01' AND '2005-12-31')
+                           AND (psam.date BETWEEN '2009-01-01' AND '2005-12-31'))
                      OR ((dsam.date BETWEEN '2010-01-01' AND '2005-12-31')
-                     AND (psam.date BETWEEN '2010-01-01' AND '2005-12-31'))
+                           AND (psam.date BETWEEN '2010-01-01' AND '2005-12-31'))
                      OR ((dsam.date BETWEEN '2011-01-01' AND '2005-12-31')
-                     AND (psam.date BETWEEN '2011-01-01' AND '2005-12-31'))
+                           AND (psam.date BETWEEN '2011-01-01' AND '2005-12-31'))
                      OR ((dsam.date BETWEEN '2012-01-01' AND '2005-12-31')
-                     AND (psam.date BETWEEN '2012-01-01' AND '2005-12-31'))
+                           AND (psam.date BETWEEN '2012-01-01' AND '2005-12-31'))
                      OR ((dsam.date BETWEEN '2013-01-01' AND '2005-12-31')
-                     AND (psam.date BETWEEN '2013-01-01' AND '2005-12-31'))
+                           AND (psam.date BETWEEN '2013-01-01' AND '2005-12-31'))
                      OR ((dsam.date BETWEEN '2014-01-01' AND '2005-12-31')
-                     AND (psam.date BETWEEN '2014-01-01' AND '2005-12-31'))
+                           AND (psam.date BETWEEN '2014-01-01' AND '2005-12-31'))
                      OR ((dsam.date BETWEEN '2015-01-01' AND '2005-12-31')
-                     AND (psam.date BETWEEN '2015-01-01' AND '2005-12-31'))
+                           AND (psam.date BETWEEN '2015-01-01' AND '2005-12-31')))
                     LIMIT 1000")
+
 
 sam_2join = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date 
                      FROM dia.dia_samples AS dsam
