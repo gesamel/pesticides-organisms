@@ -289,7 +289,7 @@ sam_2join2 = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date,
 #                    EXTRACT(YEAR FROM psam.date) AS psm_year
 #                     FROM dia.dia_samples AS dsam
 #                     INNER JOIN views.psm_samples_2005 AS psam 
-#                     ON dsam.sam_year = psam.psm.year
+#                     ON dsam.sam_year = psam.psm_year
 #                    LIMIT 100");
 
 
@@ -307,3 +307,4 @@ sam_2join2 = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date,
 dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
+
