@@ -55,25 +55,11 @@ require(mapview)
 
 dia_sites = dbGetQuery(con, "SELECT * FROM dia.dia_sites")
 dia_sites_geo = st_read_db(con, query = "SELECT * FROM dia.dia_sites LIMIT 10")
-# dia_sam = dbGetQuery(con, "SELECT * FROM dia.dia_samples LIMIT 100")
-mapview(dia_sites_geo)
-
-dbDisconnect(con)
-dbUnloadDriver(drv)
-```
-
-## Get  diatom samples sampled after 2004
-
-There are diatom samples from 2004 in the database. For the PSM data, no samples of 2004 are in the database. Therefore, data doesn't need to be queried specifically.
-
-```{r load-diatom-2005-data, echo=TRUE, message=FALSE}
-drv = dbDriver("PostgreSQL")
-con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
-
 dia_sam = dbGetQuery(con, "SELECT *
                        FROM dia.dia_samples
                        WHERE date > '2004-12-31'
-                       ")
+                       LIMIT 10")
+mapview(dia_sites_geo)
 
 dbDisconnect(con)
 dbUnloadDriver(drv)
@@ -171,12 +157,12 @@ psm_sam_05 <- psm_samples[psm_samples$year=="2005",]
 
 ```
 Want to compare tables on year and site_id:
-Include only herbicide data
-Code is not appropriate yet.
+Include only herbicide data.
 ```{r  join-on-siteid, echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
 
+# Extract year from date
 sam_tab = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date, 
                     EXTRACT(YEAR FROM dsam.date) AS sam_year,
                     EXTRACT(YEAR FROM psam.date) AS psm_year
@@ -184,19 +170,6 @@ sam_tab = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date,
                      INNER JOIN views.psm_samples_2005 AS psam 
                      ON dsam.site_id = psam.site_id
                     LIMIT 100");
-
-date_tab = dbGetQuery(con, " SELECT dsam.site_id, dsam.date
-                     FROM dia.dia_samples AS dsam
-                    WHERE dsam.date BETWEEN '2005-01-01' AND '2005-12-31'
-                     ")
-
-sam_tab1 = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date 
-                     FROM dia.dia_samples AS dsam
-                     INNER JOIN views.psm_samples_2005 AS psam 
-                     ON dsam.site_id = psam.site_id
-                    WHERE (dsam.date BETWEEN '2005-01-01' AND '2005-12-31')
-                     AND (psam.date BETWEEN '2005-01-01' AND '2005-12-31')
-                    ")
 
 # Horrible style but at least it works...
 dia_herb_year = dbGetQuery(con, " SELECT dsam.site_id, dsam.date AS d_date, 
@@ -209,89 +182,58 @@ dia_herb_year = dbGetQuery(con, " SELECT dsam.site_id, dsam.date AS d_date,
                     WHERE var.psm_type = 'herbicide'
                      AND   (((dsam.date BETWEEN '2005-01-01' AND '2005-12-31')
                            AND (psam.date BETWEEN '2005-01-01' AND '2005-12-31'))
-                     OR ((dsam.date BETWEEN '2006-01-01' AND '2005-12-31')
-                           AND (psam.date BETWEEN '2006-01-01' AND '2005-12-31'))
-                     OR ((dsam.date BETWEEN '2007-01-01' AND '2005-12-31')
-                           AND (psam.date BETWEEN '2007-01-01' AND '2005-12-31'))
-                     OR ((dsam.date BETWEEN '2008-01-01' AND '2005-12-31')
-                           AND (psam.date BETWEEN '2008-01-01' AND '2005-12-31'))
-                     OR ((dsam.date BETWEEN '2009-01-01' AND '2005-12-31')
-                           AND (psam.date BETWEEN '2009-01-01' AND '2005-12-31'))
-                     OR ((dsam.date BETWEEN '2010-01-01' AND '2005-12-31')
-                           AND (psam.date BETWEEN '2010-01-01' AND '2005-12-31'))
-                     OR ((dsam.date BETWEEN '2011-01-01' AND '2005-12-31')
-                           AND (psam.date BETWEEN '2011-01-01' AND '2005-12-31'))
-                     OR ((dsam.date BETWEEN '2012-01-01' AND '2005-12-31')
-                           AND (psam.date BETWEEN '2012-01-01' AND '2005-12-31'))
-                     OR ((dsam.date BETWEEN '2013-01-01' AND '2005-12-31')
-                           AND (psam.date BETWEEN '2013-01-01' AND '2005-12-31'))
-                     OR ((dsam.date BETWEEN '2014-01-01' AND '2005-12-31')
-                           AND (psam.date BETWEEN '2014-01-01' AND '2005-12-31'))
-                     OR ((dsam.date BETWEEN '2015-01-01' AND '2005-12-31')
-                           AND (psam.date BETWEEN '2015-01-01' AND '2005-12-31')))
+                     OR ((dsam.date BETWEEN '2006-01-01' AND '2006-12-31')
+                           AND (psam.date BETWEEN '2006-01-01' AND '2006-12-31'))
+                     OR ((dsam.date BETWEEN '2007-01-01' AND '2007-12-31')
+                           AND (psam.date BETWEEN '2007-01-01' AND '2007-12-31'))
+                     OR ((dsam.date BETWEEN '2008-01-01' AND '2008-12-31')
+                           AND (psam.date BETWEEN '2008-01-01' AND '2008-12-31'))
+                     OR ((dsam.date BETWEEN '2009-01-01' AND '2009-12-31')
+                           AND (psam.date BETWEEN '2009-01-01' AND '2009-12-31'))
+                     OR ((dsam.date BETWEEN '2010-01-01' AND '2010-12-31')
+                           AND (psam.date BETWEEN '2010-01-01' AND '2019-12-31'))
+                     OR ((dsam.date BETWEEN '2011-01-01' AND '2011-12-31')
+                           AND (psam.date BETWEEN '2011-01-01' AND '2011-12-31'))
+                     OR ((dsam.date BETWEEN '2012-01-01' AND '2012-12-31')
+                           AND (psam.date BETWEEN '2012-01-01' AND '2012-12-31'))
+                     OR ((dsam.date BETWEEN '2013-01-01' AND '2013-12-31')
+                           AND (psam.date BETWEEN '2013-01-01' AND '2013-12-31'))
+                     OR ((dsam.date BETWEEN '2014-01-01' AND '20014-12-31')
+                           AND (psam.date BETWEEN '2014-01-01' AND '2014-12-31'))
+                     OR ((dsam.date BETWEEN '2015-01-01' AND '2015-12-31')
+                           AND (psam.date BETWEEN '2015-01-01' AND '2015-12-31')))
                     LIMIT 1000")
-
-
-sam_2join = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date 
-                     FROM dia.dia_samples AS dsam
-                     INNER JOIN views.psm_samples_2005 AS psam 
-                     ON (dsam.site_id = psam.site_id)
-                    AND (dsam.date = psam.date)
-                    ")
-
-sam_2join1 = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date, 
-                      EXTRACT(YEAR FROM dsam.date) AS sam_year,
-                     EXTRACT(YEAR FROM psam.date) AS psm_year
-                     FROM dia.dia_samples AS dsam
-                     INNER JOIN views.psm_samples_2005 AS psam 
-                     ON (dsam.site_id = psam.site_id)
-                    AND (dsam.date = psam.date)
-                    LIMIT 100")
-
-# ERROR: sam_year does not exist
-sam_2join2 = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date, 
-                      EXTRACT(YEAR FROM dsam.date) AS sam_year,
-                     EXTRACT(YEAR FROM psam.date) AS psm_year
-                     FROM dia.dia_samples AS dsam
-                     INNER JOIN views.psm_samples_2005 AS psam 
-                     ON (dsam.site_id = psam.site_id)
-                    AND (dsam.date = psam.date)
-                    LIMIT 100")
-
-
-# sam_tab1 = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date, 
-#                    EXTRACT(YEAR FROM dsam.date) AS sam_year,
-#                    EXTRACT(YEAR FROM psam.date) AS psm_year
-#                     FROM dia.dia_samples AS dsam
-#                     INNER JOIN views.psm_samples_2005 AS psam 
-#                     ON dsam.site_id = psam.site_id
-#                    WHERE sam_year LIKE '2006'
-#                    LIMIT 100");
-
-
-# All queries don't work:
-
-# sam_tab2 = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date, 
-#                    EXTRACT(YEAR FROM dsam.date) AS sam_year,
-#                    EXTRACT(YEAR FROM psam.date) AS psm_year
-#                     FROM dia.dia_samples AS dsam
-#                     INNER JOIN views.psm_samples_2005 AS psam 
-#                     ON dsam.sam_year = psam.psm_year
-#                    LIMIT 100");
-
-
-# sam_tab2 = dbGetQuery(con, "SELECT site_id, sam_year, psm_year
-#       FROM sam_tab AS tab1
-#       INNER JOIN AS tab2
-#       ON tab1.sam_year = tab2.psm_year")
-
-# sqldf("SELECT site_id, sam_year, psm_year
-#       FROM sam_tab AS tab1
-#       INNER JOIN AS tab2
-#       ON tab1.sam_year = tab2.psm_year")
-
          
 dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
 
+# Creating a data frame
+```{r  create-data-frame, echo=TRUE, message=FALSE}
+drv = dbDriver("PostgreSQL")
+con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+
+
+dia_sam_year = dbGetQuery(con, " SELECT *, 
+                    EXTRACT(YEAR FROM dsam.date) AS year
+                     FROM dia.dia_samples AS dsam
+                    WHERE date >= '2005-01-01'
+                    LIMIT 100")
+
+psm_sam_year = dbGetQuery(con, " SELECT  psam.sample_id, psam.site_id,psam.date, psam.qualifier, psam.value, psam.unit, var.name, var.cas, var.pgroup, var.psm_type, var.pan_class,
+                    EXTRACT(YEAR FROM psam.date) AS year
+                     FROM views.psm_samples_2005 AS psam
+                               JOIN phch.phch_variables var 
+                              ON var.variable_id = psam.variable_id
+                    WHERE date >= '2005-01-01'
+                     AND var.psm_type = 'herbicide'
+                    LIMIT 100")
+
+# Create the data frame
+samples <- merge(dia_sam_year, psm_sam_year, by = c("site_id", "year"))
+# results in empty data
+
+dbDisconnect(con)
+dbUnloadDriver(drv)
+```
