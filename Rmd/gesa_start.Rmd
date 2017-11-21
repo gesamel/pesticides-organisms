@@ -39,7 +39,8 @@ psm_samples = dbGetQuery(con, "SELECT *
                                FROM views.psm_samples_2005 sam
                                JOIN phch.phch_variables var 
                               ON var.variable_id = sam.variable_id 
-                               LIMIT 1000")
+                         WHERE var.psm_type = 'herbicide'
+                         LIMIT 1000")
 
 dbDisconnect(con)
 dbUnloadDriver(drv)
@@ -110,26 +111,35 @@ dia_sites[dia_sites$site_nr=="CEN901",] # no results
 # Random site_nr taken from dia_sites as a cross-check to see if code is correct.
 dia_sites[dia_sites$site_nr=="CEZ016",] # 1 result
 
-# Check the other way around. Are site_nr of dia_sites found in psm_sites?
-psm_sites[psm_sites$site_nr=="CEZ016",] # 1 result 
+# Check the other way around. Are site_nr of dia_sites found in psm_sites? YES.
+psm_sites[psm_sites$site_nr=="CEZ016",] # 1 result
+dia_sites[dia_sites$site_nr=="CEZ016",] # 1 result
 psm_sites[psm_sites$site_nr=="CKO317",] # 1 result
+dia_sites[dia_sites$site_nr=="CKO317",] # 1 result
+psm_sites[psm_sites$site_nr=="21081",] # 1 result
+dia_sites[dia_sites$site_nr=="21081",] # no results
+psm_sites[psm_sites$site_nr=="105703",] # 1 result
+dia_sites[dia_sites$site_nr=="105703",] # 1 result
+
+
 ```
 
 Random check if site_id in dia_sites and psm_sites are the same.
-Result: Yes.
+Result: NO. Only sometimes it works.
 ``` {r echo=TRUE, message=FALSE}
 psm_sites[psm_sites$site_id=="BW_CEZ016",] # 1 result
+dia_sites[dia_sites$site_id=="BW_CEZ016",] # no result
 psm_sites[psm_sites$site_id=="BW_CKO317",] # 1 result
+dia_sites[dia_sites$site_id=="BW_CKO317",] # no result
+psm_sites[psm_sites$site_id=="BY_3390",] # 1 result
+dia_sites[dia_sites$site_id=="BY_3390",] # 1 result
+
 
 ```
 # Result
-site_id can be used to connect psm_sites and dia_sites since attribut is found in both tables.
+site_id cannot be used to connect psm_sites and dia_sites. Instead site_nr must be used
+since attribut is found in both tables.
 
-site_id is the same in all four tables.
-``` {r echo=TRUE, message=FALSE}
-psm_sites[psm_sites$site_id=="RP_10002",] # 1 result
-dia_sites[dia_sites$site_id=="BW_AI025.00",] # 1 result
-```
 
 ## Compare both sample datasets
 Filter sites where diatom and herbicide data was measured in the same year.
@@ -156,7 +166,7 @@ psm_sam_05 <- psm_samples[psm_samples$year=="2005",]
 # common <- intersect(dia_sam_05[,"site_id"], psm_sam_05[,"site_id"]) # results in empty data
 
 ```
-Want to compare tables on year and site_id:
+# Want to compare tables on year and site_id:
 Include only herbicide data.
 ```{r  join-on-siteid, echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
@@ -172,7 +182,7 @@ sam_tab = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date,
                     LIMIT 100");
 
 # Horrible style but at least it works...
-dia_herb_year = dbGetQuery(con, " SELECT dsam.site_id, dsam.date AS d_date, 
+dia_herb_year = dbGetQuery(con, " SELECT dsam.site_id, psam.site_id, dsam.date AS d_date, 
                      psam.date AS p_date
                      FROM dia.dia_samples AS dsam
                      INNER JOIN views.psm_samples_2005 AS psam 
@@ -219,19 +229,33 @@ dia_sam_year = dbGetQuery(con, " SELECT *,
                     EXTRACT(YEAR FROM dsam.date) AS year
                      FROM dia.dia_samples AS dsam
                     WHERE date >= '2005-01-01'
-                    LIMIT 100")
+                    ")
+dia_sam_year = dbGetQuery(con, " SELECT dsam.id_rs, dsam.id_pn, dsam.date, dsam.dv, dsam.iz_n, dsam.iz_b, dsam.cover, dsam.site_id, dsite.site_nr, 
+                    EXTRACT(YEAR FROM dsam.date) AS year
+                     FROM dia.dia_samples AS dsam
+                     JOIN dia.dia_sites AS dsite 
+                     ON dsam.site_id = dsite.site_id                  
+                    WHERE date >= '2005-01-01'
+                    ")
 
-psm_sam_year = dbGetQuery(con, " SELECT  psam.sample_id, psam.site_id,psam.date, psam.qualifier, psam.value, psam.unit, var.name, var.cas, var.pgroup, var.psm_type, var.pan_class,
+psm_sam_year = dbGetQuery(con, " SELECT  psam.sample_id, psam.site_id,psam.date, psam.qualifier, psam.value, psam.unit, var.name, var.cas, var.pgroup, var.psm_type, var.pan_class, psite.site_nr,
                     EXTRACT(YEAR FROM psam.date) AS year
                      FROM views.psm_samples_2005 AS psam
-                               JOIN phch.phch_variables var 
-                              ON var.variable_id = psam.variable_id
-                    WHERE date >= '2005-01-01'
+                      JOIN phch.phch_variables var 
+                      ON var.variable_id = psam.variable_id
+                      JOIN views.psm_sites_2005 AS psite 
+                      ON psam.site_id = psite.site_id                    
+                      WHERE date >= '2005-01-01'
                      AND var.psm_type = 'herbicide'
-                    LIMIT 100")
+                    LIMIT 1000")
 
 # Create the data frame
-samples <- merge(dia_sam_year, psm_sam_year, by = c("site_id", "year"))
+samples <- merge(dia_sam_year, psm_sam_year, by = c("site_nr","year"))
+samples <- merge(dia_sam_year, psm_sam_year, by = "year")
+samples2 <- merge(dia_sam_year, psm_sam_year, by = "site_nr")
+# Works for year but not for site_nr.
+#Error: cannot allocate vector of size 4.4 Gb -> if 100000 objects in both dataframes
+# merge by site_id results in emtpy data
 # results in empty data
 
 dbDisconnect(con)
@@ -241,7 +265,7 @@ dbUnloadDriver(drv)
 ## Taxon frequency
 How frequent is which taxon?
 
-```{r  create-data-frame, echo=TRUE, message=FALSE}
+```{r  taxon-frequency, echo=TRUE, message=FALSE}
 
 taxon_count <- table(dia_sam$dv)
 summary(taxon_count)
@@ -252,4 +276,8 @@ nrow(taxon_count[taxon_count$Freq<5,])
 nrow(taxon_count[taxon_count$Freq<3,])
 nrow(taxon_count[taxon_count$Freq<2,])
 # Sollte ich seltene Arten weglassen? Wenn ja, welche Arten stufe ich als selten ein?
+```
+
+```{r  read-taxalisten-data, echo=TRUE, message=FALSE}
+samples_taxon <- merge(dia_sam_year, diatom_dat, by.x="dv", by.y="DV")
 ```
