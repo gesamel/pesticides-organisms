@@ -58,7 +58,7 @@ dia_sites_geo = st_read_db(con, query = "SELECT * FROM dia.dia_sites LIMIT 10")
 dia_sam = dbGetQuery(con, "SELECT *
                        FROM dia.dia_samples
                        WHERE date > '2004-12-31'
-                       LIMIT 10")
+                       ")
 mapview(dia_sites_geo)
 
 dbDisconnect(con)
@@ -236,4 +236,20 @@ samples <- merge(dia_sam_year, psm_sam_year, by = c("site_id", "year"))
 
 dbDisconnect(con)
 dbUnloadDriver(drv)
+```
+
+## Taxon frequency
+How frequent is which taxon?
+
+```{r  create-data-frame, echo=TRUE, message=FALSE}
+
+taxon_count <- table(dia_sam$dv)
+summary(taxon_count)
+taxon_count <-as.data.frame(taxon_count)
+head(taxon_count)
+nrow(taxon_count)
+nrow(taxon_count[taxon_count$Freq<5,])
+nrow(taxon_count[taxon_count$Freq<3,])
+nrow(taxon_count[taxon_count$Freq<2,])
+# Sollte ich seltene Arten weglassen? Wenn ja, welche Arten stufe ich als selten ein?
 ```
