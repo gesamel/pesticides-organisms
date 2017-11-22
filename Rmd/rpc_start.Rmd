@@ -54,6 +54,22 @@ dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
 
+```{r load-phch-data, echo=TRUE, message=FALSE}
+drv = dbDriver("PostgreSQL")
+con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+# there are more sites than psm_sites (including only pesticides) though they aren't necessary for us.
+phch_samples = dbGetQuery(con, "SELECT *
+                                FROM phch.phch_samples sam
+                                JOIN phch.phch_variables var ON var.variable_id = sam.variable_id
+                                WHERE var.name IN ('Wassertemperatur', 'Sulfat');")
+
+dbDisconnect(con)
+dbUnloadDriver(drv)
+```
+
+
+
 
 
 ## Plot a histogram of the measured variable
