@@ -300,3 +300,33 @@ iris$Sepal.Length
 aggregate(iris$Sepal.Length, by = list(iris$Species), mean)
 
 ```
+
+Load physical-chemical data
+```{r load-phch-data, echo=TRUE, message=FALSE}
+drv = dbDriver("PostgreSQL")
+con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+# there are more sites than psm_sites (including only pesticides) though they aren't necessary for us.
+phch_samples = dbGetQuery(con, "SELECT *
+                                FROM phch.phch_samples sam
+                                JOIN phch.phch_variables var ON var.variable_id = sam.variable_id
+                                WHERE var.name IN ('Wassertemperatur', 'Sulfat');")
+
+dbDisconnect(con)
+dbUnloadDriver(drv)
+```
+
+```{r get-variables, echo=TRUE, message=FALSE}
+drv = dbDriver("PostgreSQL")
+con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+
+var_names = dbGetQuery(con, "SELECT DISTINCT var.name
+                                FROM phch.phch_samples sam
+                                JOIN phch.phch_variables var ON var.variable_id = sam.variable_id
+                                ")
+# Nitrit, Nitrat-Stickstoff, Kalium, Sichttiefe, Chlorid, Nitrat, Gesamt-Phosphor, SÃ¤urekapazitÃ¤t bis pH 8,2, Sauerstoffgehalt, Sauerstoffzehrung nach 5 (7) Tagen ohne Hemmer, Gesamt-Stickstoff, SÃ¤urekapazitÃ¤t bis pH 4,3, Stickstoff, Wasserstand (OFW), pH-Wert (Feld) Ammonium-Stickstoff,  
+
+dbDisconnect(con)
+dbUnloadDriver(drv)
+```
