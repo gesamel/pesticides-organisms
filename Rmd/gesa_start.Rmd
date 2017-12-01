@@ -280,4 +280,23 @@ nrow(taxon_count[taxon_count$Freq<2,])
 
 ```{r  read-taxalisten-data, echo=TRUE, message=FALSE}
 samples_taxon <- merge(dia_sam_year, diatom_dat, by.x="dv", by.y="DV")
+diatom_dat1<- read.table("C_Proben_Taxalisten.txt",header=T,sep="\t",dec=".")
+
+```
+
+```{r  suggestions-andreas, echo=TRUE, message=FALSE}
+require(data.table)    # good for subsampling --> datacamo course
+iris_dt <- as.data.table(iris)
+class(iris_dt)
+head(iris_dt)
+iris_dt[i = 1:100, j = mean(Sepal.Length), by = Species]
+diatom_dat1 <- fread("C_Proben_Taxalisten.txt") # schnellere funktion als read.csv usq. auch: fwrite()
+
+
+require(dplyr)     # good for subsampling
+
+iris$Sepal.Length
+# with base package:
+aggregate(iris$Sepal.Length, by = list(iris$Species), mean)
+
 ```
