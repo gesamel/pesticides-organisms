@@ -173,16 +173,16 @@ drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
 
 # Extract year from date
-sam_tab = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date, 
-                    EXTRACT(YEAR FROM dsam.date) AS sam_year,
-                    EXTRACT(YEAR FROM psam.date) AS psm_year
-                     FROM dia.dia_samples AS dsam
-                     INNER JOIN views.psm_samples_2005 AS psam 
-                     ON dsam.site_id = psam.site_id
-                    LIMIT 100");
+#sam_tab = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date, 
+#                    EXTRACT(YEAR FROM dsam.date) AS sam_year,
+#                    EXTRACT(YEAR FROM psam.date) AS psm_year
+#                     FROM dia.dia_samples AS dsam
+#                     INNER JOIN views.psm_samples_2005 AS psam 
+#                     ON dsam.site_id = psam.site_id
+#                    LIMIT 100");
 
 # Horrible style but at least it works...
-dia_herb_year = dbGetQuery(con, " SELECT dsam.site_id, psam.site_id, dsam.date AS d_date, 
+dia_herb_year = dbGetQuery(con, " SELECT dsam.site_id, psam.site_id, dsam.date AS d_date, dsam.taxon,
                      psam.date AS p_date
                      FROM dia.dia_samples AS dsam
                      INNER JOIN views.psm_samples_2005 AS psam 
@@ -212,11 +212,14 @@ dia_herb_year = dbGetQuery(con, " SELECT dsam.site_id, psam.site_id, dsam.date A
                            AND (psam.date BETWEEN '2014-01-01' AND '2014-12-31'))
                      OR ((dsam.date BETWEEN '2015-01-01' AND '2015-12-31')
                            AND (psam.date BETWEEN '2015-01-01' AND '2015-12-31')))
-                    LIMIT 1000")
+                    LIMIT 100000
+                    ")
          
 dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
+Why does this result in a list with much more sampled species than there is in the whole data set for diatom samples? -->  Code lists every possible combination of sampling dates.
+Also, should I shorten the species name to include only genus and species and no further description?
 
 # Creating a data frame
 ```{r  create-data-frame, echo=TRUE, message=FALSE}
@@ -262,21 +265,49 @@ dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
 
+## Shorten taxon name
+```{r  shorten-taxon-name, echo=TRUE, message=FALSE}
+taxa_list <-unique(dia_herb_year$taxon)
+taxa_cha <- as.character(taxa_list)
+species_list <- sort(taxa_cha) #list of all species
+species_list
+nrow(as.data.frame(species_list))
+
+taxa_genus <- sapply(strsplit(taxa_cha, ' '), '[', 1) # keeps only genus name
+taxa_species <- sapply(strsplit(taxa_cha, ' '), '[', 2) # keeps only species name
+genus_list<- sort(unique(taxa_temp))    #list of all genera
+genus_list
+nrow(as.data.frame(genus_list))
+
+# combine genus and species name
+taxon <- paste
+
+```
+There are 484 different species in the data set if limit is set to 100,000.
+
 ## Taxon frequency
-How frequent is which taxon?
+Are there any rare species? Marchant (2002) suggests to remove rare species and Cao et al.(2001) suggests this if samples were taken over a large spatial scale which holds true for the present data. So the question is what a suitable definition for rare species is. E.g. species that occur in only 1 sample.
 
 ```{r  taxon-frequency, echo=TRUE, message=FALSE}
 
-taxon_count <- table(dia_sam$dv)
+# taxon_count <- table(dia_sam$dv)
+taxon_count <- table(dia_herb_year$taxon)
+# taxon_count <- table(dia_sam$taxon)
 summary(taxon_count)
 taxon_count <-as.data.frame(taxon_count)
+taxon_count2 <- taxon_count[order(taxon_count$Freq),]
 head(taxon_count)
 nrow(taxon_count)
 nrow(taxon_count[taxon_count$Freq<5,])
 nrow(taxon_count[taxon_count$Freq<3,])
 nrow(taxon_count[taxon_count$Freq<2,])
+hist(taxon_count$Freq, breaks = 50)
+
+
+
 # Sollte ich seltene Arten weglassen? Wenn ja, welche Arten stufe ich als selten ein?
 ```
+The distribution of species frequency s very left-skewed. Most speces are present in less than ~300 samples. However, few are present in more than 1000 samples.
 
 ```{r  read-taxalisten-data, echo=TRUE, message=FALSE}
 samples_taxon <- merge(dia_sam_year, diatom_dat, by.x="dv", by.y="DV")
@@ -285,7 +316,7 @@ diatom_dat1<- read.table("C_Proben_Taxalisten.txt",header=T,sep="\t",dec=".")
 ```
 
 ```{r  suggestions-andreas, echo=TRUE, message=FALSE}
-require(data.table)    # good for subsampling --> datacamo course
+require(data.table)    # good for subsampling --> datacamp course
 iris_dt <- as.data.table(iris)
 class(iris_dt)
 head(iris_dt)
