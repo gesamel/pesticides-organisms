@@ -40,6 +40,13 @@ psm_samples = dbGetQuery(con, "SELECT *
                                JOIN phch.phch_variables var 
                               ON var.variable_id = sam.variable_id 
                          WHERE var.psm_type = 'herbicide'
+                         ORDER BY sam.sample_id
+                         LIMIT 1000")
+# without join on variable
+psm = dbGetQuery(con, "SELECT *
+                               FROM views.psm_samples_2005 sam
+                               
+                         ORDER BY sam.sample_id
                          LIMIT 1000")
 
 dbDisconnect(con)
@@ -212,7 +219,17 @@ dia_herb_year = dbGetQuery(con, " SELECT dsam.site_id, psam.site_id, dsam.date A
                            AND (psam.date BETWEEN '2014-01-01' AND '2014-12-31'))
                      OR ((dsam.date BETWEEN '2015-01-01' AND '2015-12-31')
                            AND (psam.date BETWEEN '2015-01-01' AND '2015-12-31')))
-                    LIMIT 100000
+                    LIMIT 1000
+                    ")
+
+## New try
+dia_herb_year2 = dbGetQuery(con, " SELECT dsam.site_id,  dsam.date 
+                     FROM dia.dia_samples AS dsam
+                     INTERSECT 
+                     SELECT psam.site_id, psam.date 
+                     FROM views.psm_samples_2005 AS psam
+                    WHERE   (psam.date BETWEEN '2005-01-01' AND '2005-12-31')
+                    LIMIT 1000
                     ")
          
 dbDisconnect(con)
@@ -220,6 +237,46 @@ dbUnloadDriver(drv)
 ```
 Why does this result in a list with much more sampled species than there is in the whole data set for diatom samples? -->  Code lists every possible combination of sampling dates.
 Also, should I shorten the species name to include only genus and species and no further description?
+
+```{r  another-try, echo=TRUE, message=FALSE}
+drv = dbDriver("PostgreSQL")
+con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+
+# including all years --> works, but veeeeery slowly
+join5 = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.date, dsam.taxon) dsam.site_id, dsam.date, taxon, psam.date
+                   FROM dia.dia_samples AS dsam
+                   INNER JOIN views.psm_samples_2005 AS psam
+                   ON dsam.site_id = psam.site_id
+                   WHERE (dsam.date BETWEEN '2005-01-01' AND '2005-12-31'
+                   AND psam.date BETWEEN '2005-01-01' AND '2005-12-31')
+                OR (dsam.date BETWEEN '2006-01-01' AND '2006-12-31'
+                   AND psam.date BETWEEN '2006-01-01' AND '2006-12-31')
+                OR (dsam.date BETWEEN '2007-01-01' AND '2007-12-31'
+                   AND psam.date BETWEEN '2007-01-01' AND '2007-12-31')
+                OR (dsam.date BETWEEN '2008-01-01' AND '2008-12-31'
+                   AND psam.date BETWEEN '2008-01-01' AND '2008-12-31')
+               OR (dsam.date BETWEEN '2009-01-01' AND '2009-12-31'
+                   AND psam.date BETWEEN '2009-01-01' AND '2009-12-31')
+                OR (dsam.date BETWEEN '2010-01-01' AND '2010-12-31'
+                   AND psam.date BETWEEN '2010-01-01' AND '2010-12-31')
+                 OR (dsam.date BETWEEN '2011-01-01' AND '2011-12-31'
+                   AND psam.date BETWEEN '2011-01-01' AND '2011-12-31')
+                 OR (dsam.date BETWEEN '2012-01-01' AND '2012-12-31'
+                   AND psam.date BETWEEN '2012-01-01' AND '2012-12-31')
+                 OR (dsam.date BETWEEN '2013-01-01' AND '2013-12-31'
+                   AND psam.date BETWEEN '2013-01-01' AND '2013-12-31')
+                OR (dsam.date BETWEEN '2014-01-01' AND '2014-12-31'
+                   AND psam.date BETWEEN '2014-01-01' AND '2014-12-31')
+                OR (dsam.date BETWEEN '2015-01-01' AND '2015-12-31'
+                   AND psam.date BETWEEN '2015-01-01' AND '2015-12-31')
+                   ORDER BY dsam.date, dsam.site_id, dsam.taxon
+                   LIMIT 100000")
+
+
+dbDisconnect(con)
+dbUnloadDriver(drv)
+```
 
 # Creating a data frame
 ```{r  create-data-frame, echo=TRUE, message=FALSE}
