@@ -35,14 +35,15 @@ con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBpor
 psm_sites = dbGetQuery(con, "SELECT *
                              FROM views.psm_sites_2005
                        ")
-psm_samples = dbGetQuery(con, "SELECT *
+psm_samples2 = dbGetQuery(con, "SELECT *
                                FROM views.psm_samples_2005 sam
                                JOIN phch.phch_variables var 
-                              ON var.variable_id = sam.variable_id 
+                              ON var.variable_id = sam.variable_id
                          WHERE var.psm_type = 'herbicide'
                          ORDER BY sam.sample_id
                          LIMIT 1000")
-# without join on variable
+
+
 psm = dbGetQuery(con, "SELECT *
                                FROM views.psm_samples_2005 sam
                                
@@ -68,6 +69,23 @@ dia_sam = dbGetQuery(con, "SELECT *
                        WHERE date > '2004-12-31'
                        ")
 mapview(dia_sites_geo)
+
+dbDisconnect(con)
+dbUnloadDriver(drv)
+```
+
+Load physical-chemical data
+```{r load-phch-data, echo=TRUE, message=FALSE}
+drv = dbDriver("PostgreSQL")
+con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+# there are more sites than psm_sites (including only pesticides) though they aren't necessary for us.
+phch_samples = dbGetQuery(con, "SELECT *
+                                FROM phch.phch_samples sam
+                                JOIN phch.phch_variables var ON var.variable_id = sam.variable_id
+                                WHERE var.name IN ('Wassertemperatur', 'Sulfat');")
+
+# 596477 observations
 
 dbDisconnect(con)
 dbUnloadDriver(drv)
@@ -174,77 +192,34 @@ psm_sam_05 <- psm_samples[psm_samples$year=="2005",]
 
 ```
 # Want to compare tables on year and site_id:
-Include only herbicide data.
-```{r  join-on-siteid, echo=TRUE, message=FALSE}
+Extract year from date.
+```{r  extract-year-from-date echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
 
-# Extract year from date
-#sam_tab = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date, 
-#                    EXTRACT(YEAR FROM dsam.date) AS sam_year,
-#                    EXTRACT(YEAR FROM psam.date) AS psm_year
-#                     FROM dia.dia_samples AS dsam
-#                     INNER JOIN views.psm_samples_2005 AS psam 
-#                     ON dsam.site_id = psam.site_id
-#                    LIMIT 100");
-
-# Horrible style but at least it works...
-dia_herb_year = dbGetQuery(con, " SELECT dsam.site_id, psam.site_id, dsam.date AS d_date, dsam.taxon,
-                     psam.date AS p_date
+sam_tab = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date, 
+                    EXTRACT(YEAR FROM dsam.date) AS sam_year,
+                    EXTRACT(YEAR FROM psam.date) AS psm_year
                      FROM dia.dia_samples AS dsam
                      INNER JOIN views.psm_samples_2005 AS psam 
                      ON dsam.site_id = psam.site_id
-                     JOIN phch.phch_variables AS var 
-                      ON var.variable_id = psam.variable_id
-                    WHERE var.psm_type = 'herbicide'
-                     AND   (((dsam.date BETWEEN '2005-01-01' AND '2005-12-31')
-                           AND (psam.date BETWEEN '2005-01-01' AND '2005-12-31'))
-                     OR ((dsam.date BETWEEN '2006-01-01' AND '2006-12-31')
-                           AND (psam.date BETWEEN '2006-01-01' AND '2006-12-31'))
-                     OR ((dsam.date BETWEEN '2007-01-01' AND '2007-12-31')
-                           AND (psam.date BETWEEN '2007-01-01' AND '2007-12-31'))
-                     OR ((dsam.date BETWEEN '2008-01-01' AND '2008-12-31')
-                           AND (psam.date BETWEEN '2008-01-01' AND '2008-12-31'))
-                     OR ((dsam.date BETWEEN '2009-01-01' AND '2009-12-31')
-                           AND (psam.date BETWEEN '2009-01-01' AND '2009-12-31'))
-                     OR ((dsam.date BETWEEN '2010-01-01' AND '2010-12-31')
-                           AND (psam.date BETWEEN '2010-01-01' AND '2019-12-31'))
-                     OR ((dsam.date BETWEEN '2011-01-01' AND '2011-12-31')
-                           AND (psam.date BETWEEN '2011-01-01' AND '2011-12-31'))
-                     OR ((dsam.date BETWEEN '2012-01-01' AND '2012-12-31')
-                           AND (psam.date BETWEEN '2012-01-01' AND '2012-12-31'))
-                     OR ((dsam.date BETWEEN '2013-01-01' AND '2013-12-31')
-                           AND (psam.date BETWEEN '2013-01-01' AND '2013-12-31'))
-                     OR ((dsam.date BETWEEN '2014-01-01' AND '20014-12-31')
-                           AND (psam.date BETWEEN '2014-01-01' AND '2014-12-31'))
-                     OR ((dsam.date BETWEEN '2015-01-01' AND '2015-12-31')
-                           AND (psam.date BETWEEN '2015-01-01' AND '2015-12-31')))
-                    LIMIT 1000
-                    ")
+                    LIMIT 100");
 
-## New try
-dia_herb_year2 = dbGetQuery(con, " SELECT dsam.site_id,  dsam.date 
-                     FROM dia.dia_samples AS dsam
-                     INTERSECT 
-                     SELECT psam.site_id, psam.date 
-                     FROM views.psm_samples_2005 AS psam
-                    WHERE   (psam.date BETWEEN '2005-01-01' AND '2005-12-31')
-                    LIMIT 1000
-                    ")
-         
+
 dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
-Why does this result in a list with much more sampled species than there is in the whole data set for diatom samples? -->  Code lists every possible combination of sampling dates.
+
 Also, should I shorten the species name to include only genus and species and no further description?
 
-```{r  another-try, echo=TRUE, message=FALSE}
+Select all diatom samples where environmental variable data was measured at the same site in the same year.
+```{r  select-diasamples-join-site-year, echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
 
 
 # including all years --> works, but veeeeery slowly
-join5 = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.date, dsam.taxon) dsam.site_id, dsam.date, taxon, psam.date
+join = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.date, dsam.taxon) dsam.site_id, dsam.date, taxon, psam.date
                    FROM dia.dia_samples AS dsam
                    INNER JOIN views.psm_samples_2005 AS psam
                    ON dsam.site_id = psam.site_id
@@ -272,11 +247,79 @@ join5 = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.date, dsam.taxo
                    AND psam.date BETWEEN '2015-01-01' AND '2015-12-31')
                    ORDER BY dsam.date, dsam.site_id, dsam.taxon
                    LIMIT 100000")
+# results in 47127 observations
+
+# Include to select for sites where relevant variables were measured.
+#JOIN phch.phch_variables AS var 
+#                      ON var.variable_id = psam.variable_id
+#                    WHERE var.psm_type = 'herbicide'
+
+dbDisconnect(con)
+dbUnloadDriver(drv)
+```
+```{r  join-relevant-variables, echo=TRUE, message=FALSE}
+drv = dbDriver("PostgreSQL")
+con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+join2 = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.date, dsam.taxon) dsam.site_id, dsam.date, taxon, psam.date, var.psm_type, var.name
+                   FROM dia.dia_samples AS dsam
+                   INNER JOIN views.psm_samples_2005 AS psam
+                   ON dsam.site_id = psam.site_id
+                   INNER JOIN phch.phch_variables var 
+                   ON var.variable_id = psam.variable_id 
+                     WHERE var.psm_type = 'herbicide'
+                   AND ((dsam.date BETWEEN '2005-01-01' AND '2005-12-31'
+                   AND psam.date BETWEEN '2005-01-01' AND '2005-12-31')
+                OR (dsam.date BETWEEN '2006-01-01' AND '2006-12-31'
+                   AND psam.date BETWEEN '2006-01-01' AND '2006-12-31')
+                OR (dsam.date BETWEEN '2007-01-01' AND '2007-12-31'
+                   AND psam.date BETWEEN '2007-01-01' AND '2007-12-31')
+                OR (dsam.date BETWEEN '2008-01-01' AND '2008-12-31'
+                   AND psam.date BETWEEN '2008-01-01' AND '2008-12-31')
+               OR (dsam.date BETWEEN '2009-01-01' AND '2009-12-31'
+                   AND psam.date BETWEEN '2009-01-01' AND '2009-12-31')
+                OR (dsam.date BETWEEN '2010-01-01' AND '2010-12-31'
+                   AND psam.date BETWEEN '2010-01-01' AND '2010-12-31')
+                 OR (dsam.date BETWEEN '2011-01-01' AND '2011-12-31'
+                   AND psam.date BETWEEN '2011-01-01' AND '2011-12-31')
+                 OR (dsam.date BETWEEN '2012-01-01' AND '2012-12-31'
+                   AND psam.date BETWEEN '2012-01-01' AND '2012-12-31')
+                 OR (dsam.date BETWEEN '2013-01-01' AND '2013-12-31'
+                   AND psam.date BETWEEN '2013-01-01' AND '2013-12-31')
+                OR (dsam.date BETWEEN '2014-01-01' AND '2014-12-31'
+                   AND psam.date BETWEEN '2014-01-01' AND '2014-12-31')
+                OR (dsam.date BETWEEN '2015-01-01' AND '2015-12-31'
+                   AND psam.date BETWEEN '2015-01-01' AND '2015-12-31'))
+                   ORDER BY dsam.date, dsam.site_id, dsam.taxon
+                   ")
+# results in 45980 observations
 
 
 dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
+
+```{r  select-diasamples-join-site-year, echo=TRUE, message=FALSE}
+drv = dbDriver("PostgreSQL")
+con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+#query takes for ever!
+join6 = dbGetQuery(con, "SELECT dsam.site_id, dsam.date AS d_date, taxon
+                   FROM dia.dia_samples AS dsam
+                   WHERE site_id IN 
+                   (
+                   SELECT site_id
+                   FROM views.psm_samples_2005 AS psam
+                   WHERE EXTRACT ('year' FROM psam.date) = 2005
+                   AND EXTRACT ('year' FROM dsam.date) = 2005
+                     )
+                   ")
+
+
+dbDisconnect(con)
+dbUnloadDriver(drv)
+```
+
 
 # Creating a data frame
 ```{r  create-data-frame, echo=TRUE, message=FALSE}
@@ -323,6 +366,7 @@ dbUnloadDriver(drv)
 ```
 
 ## Shorten taxon name
+Not finished yet.
 ```{r  shorten-taxon-name, echo=TRUE, message=FALSE}
 taxa_list <-unique(dia_herb_year$taxon)
 taxa_cha <- as.character(taxa_list)
@@ -348,23 +392,22 @@ Are there any rare species? Marchant (2002) suggests to remove rare species and 
 ```{r  taxon-frequency, echo=TRUE, message=FALSE}
 
 # taxon_count <- table(dia_sam$dv)
-taxon_count <- table(dia_herb_year$taxon)
+taxon_count <- table(join2$taxon)
 # taxon_count <- table(dia_sam$taxon)
 summary(taxon_count)
 taxon_count <-as.data.frame(taxon_count)
-taxon_count2 <- taxon_count[order(taxon_count$Freq),]
+taxon_count <- taxon_count[order(taxon_count$Freq),]
 head(taxon_count)
-nrow(taxon_count)
-nrow(taxon_count[taxon_count$Freq<5,])
-nrow(taxon_count[taxon_count$Freq<3,])
-nrow(taxon_count[taxon_count$Freq<2,])
+nrow(taxon_count) # 931
+nrow(taxon_count[taxon_count$Freq<5,]) # 383
+nrow(taxon_count[taxon_count$Freq<3,]) # 274
+nrow(taxon_count[taxon_count$Freq<2,]) #172
 hist(taxon_count$Freq, breaks = 50)
-
 
 
 # Sollte ich seltene Arten weglassen? Wenn ja, welche Arten stufe ich als selten ein?
 ```
-The distribution of species frequency s very left-skewed. Most speces are present in less than ~300 samples. However, few are present in more than 1000 samples.
+The distribution of species frequency s very left-skewed. Most speces are present in less than ~200 samples and few are present in more than 200 samples.
 
 ```{r  read-taxalisten-data, echo=TRUE, message=FALSE}
 samples_taxon <- merge(dia_sam_year, diatom_dat, by.x="dv", by.y="DV")
@@ -389,20 +432,6 @@ aggregate(iris$Sepal.Length, by = list(iris$Species), mean)
 
 ```
 
-Load physical-chemical data
-```{r load-phch-data, echo=TRUE, message=FALSE}
-drv = dbDriver("PostgreSQL")
-con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
-
-# there are more sites than psm_sites (including only pesticides) though they aren't necessary for us.
-phch_samples = dbGetQuery(con, "SELECT *
-                                FROM phch.phch_samples sam
-                                JOIN phch.phch_variables var ON var.variable_id = sam.variable_id
-                                WHERE var.name IN ('Wassertemperatur', 'Sulfat');")
-
-dbDisconnect(con)
-dbUnloadDriver(drv)
-```
 
 ```{r get-variables, echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
@@ -413,7 +442,7 @@ var_names = dbGetQuery(con, "SELECT DISTINCT var.name
                                 FROM phch.phch_samples sam
                                 JOIN phch.phch_variables var ON var.variable_id = sam.variable_id
                                 ")
-# Nitrit, Nitrat-Stickstoff, Kalium, Sichttiefe, Chlorid, Nitrat, Gesamt-Phosphor, SÃ¤urekapazitÃ¤t bis pH 8,2, Sauerstoffgehalt, Sauerstoffzehrung nach 5 (7) Tagen ohne Hemmer, Gesamt-Stickstoff, SÃ¤urekapazitÃ¤t bis pH 4,3, Stickstoff, Wasserstand (OFW), pH-Wert (Feld) Ammonium-Stickstoff,  
+# Nitrit, Nitrat-Stickstoff, Kalium, Sichttiefe, Chlorid, Nitrat, Gesamt-Phosphor, Sauerstoffgehalt, Sauerstoffzehrung nach 5 (7) Tagen ohne Hemmer, Gesamt-Stickstoff, Stickstoff, Wasserstand (OFW), pH-Wert (Feld) Ammonium-Stickstoff, Sauerstoffzehrung nach 7 Tagen mit Hemmer, BSB5, sedimentiert, Sauerstoffzehrung nach 21 Tagen mit Hemmer, TrÃ¼bung (physiko-chem. Messung), Elektrische LeitfÃ¤higkeit (20Â°C), Nitrit-Stickstoff, Natrium, Sulfat, Ammonium, Abfluss, spektraler Absorptionskoeffizient 436nm, freie KohlensÃ¤ure, SauerstoffsÃ¤ttigung, Stickstoff, Hydrogenkarbonat, Eisen, Wassertemperatur, Magnesium, Gesamtphosphor als PO4, Phosphor, Chemischer Sauerstoffbedarf
 
 dbDisconnect(con)
 dbUnloadDriver(drv)
