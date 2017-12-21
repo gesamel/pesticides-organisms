@@ -261,7 +261,7 @@ dbUnloadDriver(drv)
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
 
-join2 = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.date, dsam.taxon) dsam.site_id, dsam.date, taxon, psam.date, var.psm_type, var.name
+join2 = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.date, dsam.taxon) dsam.site_id, dsam.date, taxon, iz_n, psam.date, var.psm_type, var.name
                    FROM dia.dia_samples AS dsam
                    INNER JOIN views.psm_samples_2005 AS psam
                    ON dsam.site_id = psam.site_id
@@ -297,6 +297,53 @@ join2 = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.date, dsam.taxo
 
 dbDisconnect(con)
 dbUnloadDriver(drv)
+```
+
+```{r  join-2005, echo=TRUE, message=FALSE}
+drv = dbDriver("PostgreSQL")
+con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+# since iz_n (species abundance) is often empty, should I instead choose cover as abundance value?
+
+join2005 = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.taxon, dsam.date) dsam.site_id, dsam.date, taxon, dsam.iz_n, cover, psam.date, var.psm_type, var.name
+                   FROM dia.dia_samples AS dsam
+                   INNER JOIN views.psm_samples_2005 AS psam
+                   ON dsam.site_id = psam.site_id
+                   INNER JOIN phch.phch_variables var 
+                   ON var.variable_id = psam.variable_id 
+                  WHERE var.psm_type = 'herbicide'
+                   AND (dsam.date BETWEEN '2005-01-01' AND '2005-12-31'
+                   AND psam.date BETWEEN '2005-01-01' AND '2005-12-31')
+                  ORDER BY dsam.date, dsam.site_id, dsam.taxon
+                   ")
+
+dbDisconnect(con)
+dbUnloadDriver(drv)
+```
+Transform data with reshape2 package to get from long to wide data for the site_id.
+```{r  transform-data-to-wide, echo=TRUE, message=FALSE}
+
+
+tab05 <- data.frame(join2005$taxon, join2005$site_id, join2005$date,as.numeric(join2005$cover))
+names(tab05) <- c("taxon", "site_id", "date", "cover" )
+names(tab05)
+require(reshape2)
+tab05cast <- dcast(tab05, taxon + date ~ site_id, fill = 0)
+
+# Like this, same species appears several times if it was sampled on different sites on
+# several dates in the year.
+
+
+# tab05cast <- dcast(tab05, taxon ~ site_id, fill = 0)
+# aggregation function needed if variables do not identify a single observation for
+# each output cell. Defaults to length (with a message) if needed but not specified.
+# eg Achnanthes minutissima var. minutissima is present twice at site_id NW_137315
+# Answer: Result of if same site was sampled twice in one year.
+
+# creates correct type of data but cover data is not included
+# dcast ( tab, taxon ~ site_id + year ) would also be possible
+
+
 ```
 
 ```{r  select-diasamples-join-site-year, echo=TRUE, message=FALSE}
@@ -398,16 +445,23 @@ summary(taxon_count)
 taxon_count <-as.data.frame(taxon_count)
 taxon_count <- taxon_count[order(taxon_count$Freq),]
 head(taxon_count)
-nrow(taxon_count) # 931
-nrow(taxon_count[taxon_count$Freq<5,]) # 383
-nrow(taxon_count[taxon_count$Freq<3,]) # 274
-nrow(taxon_count[taxon_count$Freq<2,]) #172
+freqn <- nrow(taxon_count) # 931
+freq3 <- nrow(taxon_count[taxon_count$Freq<5,]) # 383
+freq2 <- nrow(taxon_count[taxon_count$Freq<3,]) # 274
+freq1 <- nrow(taxon_count[taxon_count$Freq<2,]) # 172
 hist(taxon_count$Freq, breaks = 50)
+
+# relative frequency of species that are only present at 1 site
+freq1/freqn*100
 
 
 # Sollte ich seltene Arten weglassen? Wenn ja, welche Arten stufe ich als selten ein?
 ```
 The distribution of species frequency s very left-skewed. Most speces are present in less than ~200 samples and few are present in more than 200 samples.
+
+```{r  remove-rare-species, echo=TRUE, message=FALSE}
+# Removal of the 172 species that occur only at 1 site.
+```
 
 ```{r  read-taxalisten-data, echo=TRUE, message=FALSE}
 samples_taxon <- merge(dia_sam_year, diatom_dat, by.x="dv", by.y="DV")
