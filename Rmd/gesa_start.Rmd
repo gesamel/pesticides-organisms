@@ -210,8 +210,6 @@ dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
 
-Also, should I shorten the species name to include only genus and species and no further description?
-
 Select all diatom samples where environmental variable data was measured at the same site in the same year.
 ```{r  select-diasamples-join-site-year, echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
@@ -261,7 +259,7 @@ dbUnloadDriver(drv)
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
 
-join2 = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.date, dsam.taxon) dsam.site_id, dsam.date, taxon, iz_n, psam.date, var.psm_type, var.name
+join2 = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.date, dsam.taxon) dsam.site_id, dsam.date, taxon, iz_n, cover, var.psm_type, var.name
                    FROM dia.dia_samples AS dsam
                    INNER JOIN views.psm_samples_2005 AS psam
                    ON dsam.site_id = psam.site_id
@@ -303,9 +301,9 @@ dbUnloadDriver(drv)
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
 
-# since iz_n (species abundance) is often empty, should I instead choose cover as abundance value?
+# Since iz_n (species abundance) is often empty,  I instead choose covefor abundance data.
 
-join2005 = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.taxon, dsam.date) dsam.site_id, dsam.date, taxon, dsam.iz_n, cover, psam.date, var.psm_type, var.name
+# join2005b = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.taxon, dsam.date) dsam.site_id, dsam.date, taxon, dsam.iz_n, cover, psam.date, var.psm_type, var.name
                    FROM dia.dia_samples AS dsam
                    INNER JOIN views.psm_samples_2005 AS psam
                    ON dsam.site_id = psam.site_id
@@ -320,60 +318,95 @@ join2005 = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.taxon, dsam.
 dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
-Transform data with reshape2 package to get from long to wide data for the site_id.
+## Shorten taxon name
+```{r  shorten-taxon-name, echo=TRUE, message=FALSE}
+taxa_list <-unique(join2$taxon)
+taxa_cha <- as.character(taxa_list)
+species_list <- sort(taxa_cha) #list of all species
+species_list
+nrow(as.data.frame(species_list)) # 931 different taxa in the dataset
+
+taxa_genus <- sapply(strsplit(taxa_cha, ' '), '[', 1) # keeps only genus name
+taxa_species <- sapply(strsplit(taxa_cha, ' '), '[', 2) # keeps only species name
+genus_list<- sort(unique(taxa_temp))    #list of all genera
+genus_list
+nrow(as.data.frame(genus_list))
+
+# Keep only Genus + species name.
+join2$taxon <- sub("^(\\S*\\s+\\S+).*", "\\1", join2$taxon)
+# Only 800 differet species left after shortening of the name.
+```
+
+# Subset only data from 2005 from the table join2005.
+```{r  subset-2005-data, echo=TRUE, message=FALSE}
+# within R and not via SQL query
+join2005 <- subset(join2, date < as.Date("2006-01-01"))
+# join2006 <- subset(join2, (date < as.Date("2007-01-01"))&(date > as.Date("2005-12-31")))
+
+```
+
+# Transform data with reshape2 package to get from long to wide data for the site_id.
 ```{r  transform-data-to-wide, echo=TRUE, message=FALSE}
 
-
-tab05 <- data.frame(join2005$taxon, join2005$site_id, join2005$date,as.numeric(join2005$cover))
-names(tab05) <- c("taxon", "site_id", "date", "cover" )
-names(tab05)
+dia05 <- data.frame(join2005$taxon, join2005$site_id, join2005$date, as.numeric(join2005$cover))
+names(dia05) <- c("taxon", "site_id", "date", "cover" )
+names(dia05)
 require(reshape2)
-tab05cast <- dcast(tab05, taxon + date ~ site_id, fill = 0)
+cast05a <- dcast(dia05, taxon + date ~ site_id, fill = 0)
 
-# Like this, same species appears several times if it was sampled on different sites on
+# Like this, same species appear several times if it was sampled on different sites on
 # several dates in the year.
 
 
-# tab05cast <- dcast(tab05, taxon ~ site_id, fill = 0)
+cast05 <- dcast(dia05, site_id ~ taxon, fill = 0) #amount of presence given
+cast05 <- dcast(dia05, site_id ~ taxon, fill = 0, fun.aggregate = mean) #mean of cover
+
+cast05 <-cast05[, -1] # removal of site information.
+
+
 # aggregation function needed if variables do not identify a single observation for
 # each output cell. Defaults to length (with a message) if needed but not specified.
 # eg Achnanthes minutissima var. minutissima is present twice at site_id NW_137315
 # Answer: Result of if same site was sampled twice in one year.
 
-# creates correct type of data but cover data is not included
 # dcast ( tab, taxon ~ site_id + year ) would also be possible
+```
 
+
+```{r  remove-rare-species, echo=TRUE, message=FALSE}
+# presence-absence transformation to calculate species number per site
+cast05_pa <-decostand(cast05, "pa")  #, na.rm = TRUE ??
+# calculate sum per species
+spec_sum <- apply(cast05_pa,2,sum)
+sort(spec_sum)
+
+
+# remove species that occur at less than 2 sites
+# spec_sum needs to be calculated with number of presence data and here continued with cover data
+spec_fin <- cast05[, ! spec_sum <2]
+
+sort(apply(spec_fin, 2, max))
+# 2 species remain with cover of 0.0 -> Nitzschia sigmoidea + Pinnularia microstauron
+sort(apply(spec_fin, 2, sd))
 
 ```
 
-```{r  select-diasamples-join-site-year, echo=TRUE, message=FALSE}
-drv = dbDriver("PostgreSQL")
-con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+```{r  dca, echo=TRUE, message=FALSE}
+require(vegan)
+spec_dca<- decorana(spec_fin)
+spec_dca
 
-#query takes for ever!
-join6 = dbGetQuery(con, "SELECT dsam.site_id, dsam.date AS d_date, taxon
-                   FROM dia.dia_samples AS dsam
-                   WHERE site_id IN 
-                   (
-                   SELECT site_id
-                   FROM views.psm_samples_2005 AS psam
-                   WHERE EXTRACT ('year' FROM psam.date) = 2005
-                   AND EXTRACT ('year' FROM dsam.date) = 2005
-                     )
-                   ")
-
-
-dbDisconnect(con)
-dbUnloadDriver(drv)
+# axis lenght = SD. For axis length < 3, linear analysis should be used, for axis length >3, unimodal analysis should be performed.
+# If presence-absence data is used: DCA1 length = 2.5
+# If cover data is used: DCA1 length = 3.6 --> unimodal approach would be fine.
 ```
-
 
 # Creating a data frame
 ```{r  create-data-frame, echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
 
-
+# Functions not needed at the moment but keep them anyways, just in case.
 
 dia_sam_year = dbGetQuery(con, " SELECT *, 
                     EXTRACT(YEAR FROM dsam.date) AS year
@@ -412,26 +445,7 @@ dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
 
-## Shorten taxon name
-Not finished yet.
-```{r  shorten-taxon-name, echo=TRUE, message=FALSE}
-taxa_list <-unique(dia_herb_year$taxon)
-taxa_cha <- as.character(taxa_list)
-species_list <- sort(taxa_cha) #list of all species
-species_list
-nrow(as.data.frame(species_list))
 
-taxa_genus <- sapply(strsplit(taxa_cha, ' '), '[', 1) # keeps only genus name
-taxa_species <- sapply(strsplit(taxa_cha, ' '), '[', 2) # keeps only species name
-genus_list<- sort(unique(taxa_temp))    #list of all genera
-genus_list
-nrow(as.data.frame(genus_list))
-
-# combine genus and species name
-taxon <- paste
-
-```
-There are 484 different species in the data set if limit is set to 100,000.
 
 ## Taxon frequency
 Are there any rare species? Marchant (2002) suggests to remove rare species and Cao et al.(2001) suggests this if samples were taken over a large spatial scale which holds true for the present data. So the question is what a suitable definition for rare species is. E.g. species that occur in only 1 sample.
@@ -445,23 +459,20 @@ summary(taxon_count)
 taxon_count <-as.data.frame(taxon_count)
 taxon_count <- taxon_count[order(taxon_count$Freq),]
 head(taxon_count)
-freqn <- nrow(taxon_count) # 931
-freq3 <- nrow(taxon_count[taxon_count$Freq<5,]) # 383
-freq2 <- nrow(taxon_count[taxon_count$Freq<3,]) # 274
-freq1 <- nrow(taxon_count[taxon_count$Freq<2,]) # 172
-hist(taxon_count$Freq, breaks = 50)
+freqn <- nrow(taxon_count) # 931   #800 after name shortening
+freq3 <- nrow(taxon_count[taxon_count$Freq<5,]) # 383   # 327 after name shortening
+freq2 <- nrow(taxon_count[taxon_count$Freq<3,]) # 274   # 229 after name shortening
+freq1 <- nrow(taxon_count[taxon_count$Freq<2,]) # 172   # 141 after name shortening
+hist(taxon_count$Freq, breaks = 50)   
 
 # relative frequency of species that are only present at 1 site
-freq1/freqn*100
+freq1/freqn*100       # 17.6 % of all species are only present at 1 site
+freq1/nrow(join2)*100 # 0.3 % of all Samples-site combinations represent a species that was sampled only once.
 
 
 # Sollte ich seltene Arten weglassen? Wenn ja, welche Arten stufe ich als selten ein?
 ```
-The distribution of species frequency s very left-skewed. Most speces are present in less than ~200 samples and few are present in more than 200 samples.
-
-```{r  remove-rare-species, echo=TRUE, message=FALSE}
-# Removal of the 172 species that occur only at 1 site.
-```
+The distribution of species frequency is very left-skewed. Most speces are present in less than ~200 samples and few are present in more than 200 samples.
 
 ```{r  read-taxalisten-data, echo=TRUE, message=FALSE}
 samples_taxon <- merge(dia_sam_year, diatom_dat, by.x="dv", by.y="DV")
@@ -497,6 +508,20 @@ var_names = dbGetQuery(con, "SELECT DISTINCT var.name
                                 JOIN phch.phch_variables var ON var.variable_id = sam.variable_id
                                 ")
 # Nitrit, Nitrat-Stickstoff, Kalium, Sichttiefe, Chlorid, Nitrat, Gesamt-Phosphor, Sauerstoffgehalt, Sauerstoffzehrung nach 5 (7) Tagen ohne Hemmer, Gesamt-Stickstoff, Stickstoff, Wasserstand (OFW), pH-Wert (Feld) Ammonium-Stickstoff, Sauerstoffzehrung nach 7 Tagen mit Hemmer, BSB5, sedimentiert, Sauerstoffzehrung nach 21 Tagen mit Hemmer, TrÃ¼bung (physiko-chem. Messung), Elektrische LeitfÃ¤higkeit (20Â°C), Nitrit-Stickstoff, Natrium, Sulfat, Ammonium, Abfluss, spektraler Absorptionskoeffizient 436nm, freie KohlensÃ¤ure, SauerstoffsÃ¤ttigung, Stickstoff, Hydrogenkarbonat, Eisen, Wassertemperatur, Magnesium, Gesamtphosphor als PO4, Phosphor, Chemischer Sauerstoffbedarf
+
+dbDisconnect(con)
+dbUnloadDriver(drv)
+```
+
+```{r load-ec50-data, echo=TRUE, message=FALSE}
+drv = dbDriver("PostgreSQL")
+con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+ec50 = dbGetQuery(con, "SELECT variable_id, name, n_al, ec50_al_fr_min, ec50_al_fr_min_taxa, ec50_al_fr_perc20, ec50_al_fr_mean
+                                FROM phch.phch_ec50
+                                LIMIT 100
+                                ")
+
 
 dbDisconnect(con)
 dbUnloadDriver(drv)
