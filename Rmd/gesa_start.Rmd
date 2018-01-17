@@ -248,7 +248,7 @@ join = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.date, dsam.taxon
                    ORDER BY dsam.date, dsam.site_id, dsam.taxon
                    ")
 # results in 45980 observations
-
+join$year <- as.numeric(format(join$date, '%Y'))
 
 dbDisconnect(con)
 dbUnloadDriver(drv)
@@ -331,6 +331,7 @@ dia15 <- data.frame(join2015$taxon, join2015$site_id, join2015$date, as.numeric(
 dia05 <- dia05[complete.cases(dia05), ]
 dia08 <- dia08[complete.cases(dia08), ]
 dia09 <- dia09[complete.cases(dia09), ]
+dia12 <- dia12[complete.cases(dia12), ]
 # if conducted for 2012, no samples are left.
 
 
@@ -472,24 +473,70 @@ plot(spec_dca05, display="both")
 
 spec_dca06<- decorana(spec_fin06)
 spec_dca06 #DCA1 length = 7.48
+plot(spec_dca06, display="both")
 
 spec_dca07<- decorana(spec_fin07)
 spec_dca07 #DCA1 length = 4.83
+plot(spec_dca07, display="both")
 
 spec_dca08<- decorana(spec_fin08)   # many samples deleted before
 spec_dca08 #DCA1 length = 4.84
+plot(spec_dca08, display="both")
 
 spec_dca09<- decorana(spec_fin09)   # many samples deleted before
 spec_dca09 #DCA1 length = 2.39
+plot(spec_dca09, display="both")
 
 spec_dca10<- decorana(spec_fin10)
 spec_dca10 #DCA1 length = 4.31
+plot(spec_dca10, display="both")
 
 spec_dca11<- decorana(spec_fin11)
 spec_dca11 #DCA1 length = 6.13
+plot(spec_dca11, display="both")
 
 # Conducting unimodal analysis would be okay for all years except for 2009.
 ```
+```{r  sampling-frequency, echo=TRUE, message=FALSE}
+# tapply(Summary Variable, Group Variable, Function)
+tapply(join$site_id, join$year,nrow)
+
+
+n05a <-nrow(join[join$year=="2005", ]) # all samples left
+n05b <- nrow(dia05)                    # samples with cover = NA removed
+n06a <-nrow(join[join$year=="2006", ]) 
+n06b <- nrow(dia06) 
+n07a <-nrow(join[join$year=="2007", ]) 
+n07b <- nrow(dia07) 
+n08a <-nrow(join[join$year=="2008", ]) 
+n08b <- nrow(dia08) 
+n09a <-nrow(join[join$year=="2009", ]) 
+n09b <- nrow(dia09) 
+n10a <-nrow(join[join$year=="2010", ]) 
+n10b <- nrow(dia10) 
+n11a <-nrow(join[join$year=="2011", ]) 
+n11b <- nrow(dia11)
+n12a <-nrow(join[join$year=="2012", ]) 
+n12b <- nrow(dia12)
+
+freqa <- c(n05a, n06a, n07a, n08a, n09a, n10a, n11a, n12a)
+freqb <- c(n05b, n06b, n07b, n08b, n09b, n10b, n11b, n12b)
+
+# Visualize data
+year <- c("2005","2006", "2007", "2008", "2009", "2010", "2011", "2012")
+
+# Complete data set
+freqa_tab <- rbind(freqa)
+colnames(freqa_tab) <-year
+barplot(freqa_tab, xlab ="Year", ylab ="Amount of samples")
+
+# Rows removed were cover = NA
+freqb_tab <- rbind(freqb)
+colnames(freqb_tab) <-year
+barplot(freqb_tab, xlab ="Year", ylab ="Amount of samples")
+
+```
+
 Conduct CA
 ```{r  ca, echo=TRUE, message=FALSE}
 # conduct CA
