@@ -210,56 +210,13 @@ dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
 
-Select all diatom samples where environmental variable data was measured at the same site in the same year.
-```{r  select-diasamples-join-site-year, echo=TRUE, message=FALSE}
-drv = dbDriver("PostgreSQL")
-con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+Select all diatom samples where environmental variable data was measured at the same site in the same year and where herbicides were detected.
 
-
-# including all years --> works, but veeeeery slowly
-join = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.date, dsam.taxon) dsam.site_id, dsam.date, taxon, psam.date
-                   FROM dia.dia_samples AS dsam
-                   INNER JOIN views.psm_samples_2005 AS psam
-                   ON dsam.site_id = psam.site_id
-                   WHERE (dsam.date BETWEEN '2005-01-01' AND '2005-12-31'
-                   AND psam.date BETWEEN '2005-01-01' AND '2005-12-31')
-                OR (dsam.date BETWEEN '2006-01-01' AND '2006-12-31'
-                   AND psam.date BETWEEN '2006-01-01' AND '2006-12-31')
-                OR (dsam.date BETWEEN '2007-01-01' AND '2007-12-31'
-                   AND psam.date BETWEEN '2007-01-01' AND '2007-12-31')
-                OR (dsam.date BETWEEN '2008-01-01' AND '2008-12-31'
-                   AND psam.date BETWEEN '2008-01-01' AND '2008-12-31')
-               OR (dsam.date BETWEEN '2009-01-01' AND '2009-12-31'
-                   AND psam.date BETWEEN '2009-01-01' AND '2009-12-31')
-                OR (dsam.date BETWEEN '2010-01-01' AND '2010-12-31'
-                   AND psam.date BETWEEN '2010-01-01' AND '2010-12-31')
-                 OR (dsam.date BETWEEN '2011-01-01' AND '2011-12-31'
-                   AND psam.date BETWEEN '2011-01-01' AND '2011-12-31')
-                 OR (dsam.date BETWEEN '2012-01-01' AND '2012-12-31'
-                   AND psam.date BETWEEN '2012-01-01' AND '2012-12-31')
-                 OR (dsam.date BETWEEN '2013-01-01' AND '2013-12-31'
-                   AND psam.date BETWEEN '2013-01-01' AND '2013-12-31')
-                OR (dsam.date BETWEEN '2014-01-01' AND '2014-12-31'
-                   AND psam.date BETWEEN '2014-01-01' AND '2014-12-31')
-                OR (dsam.date BETWEEN '2015-01-01' AND '2015-12-31'
-                   AND psam.date BETWEEN '2015-01-01' AND '2015-12-31')
-                   ORDER BY dsam.date, dsam.site_id, dsam.taxon
-                   LIMIT 100000")
-# results in 47127 observations
-
-# Include to select for sites where relevant variables were measured.
-#JOIN phch.phch_variables AS var 
-#                      ON var.variable_id = psam.variable_id
-#                    WHERE var.psm_type = 'herbicide'
-
-dbDisconnect(con)
-dbUnloadDriver(drv)
-```
 ```{r  join-relevant-variables, echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
 
-join2 = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.date, dsam.taxon) dsam.site_id, dsam.date, taxon, iz_n, cover, var.psm_type, var.name
+join = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.date, dsam.taxon) dsam.site_id, dsam.date, taxon, iz_n, cover, var.psm_type, var.name
                    FROM dia.dia_samples AS dsam
                    INNER JOIN views.psm_samples_2005 AS psam
                    ON dsam.site_id = psam.site_id
@@ -301,7 +258,7 @@ dbUnloadDriver(drv)
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
 
-# Since iz_n (species abundance) is often empty,  I instead choose covefor abundance data.
+# Since iz_n (species abundance) is often empty,  I instead choose cover for abundance data.
 
 # join2005b = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.taxon, dsam.date) dsam.site_id, dsam.date, taxon, dsam.iz_n, cover, psam.date, var.psm_type, var.name
                    FROM dia.dia_samples AS dsam
@@ -320,7 +277,7 @@ dbUnloadDriver(drv)
 ```
 ## Shorten taxon name
 ```{r  shorten-taxon-name, echo=TRUE, message=FALSE}
-taxa_list <-unique(join2$taxon)
+taxa_list <-unique(join$taxon)
 taxa_cha <- as.character(taxa_list)
 species_list <- sort(taxa_cha) #list of all species
 species_list
@@ -333,24 +290,64 @@ genus_list
 nrow(as.data.frame(genus_list))
 
 # Keep only Genus + species name.
-join2$taxon <- sub("^(\\S*\\s+\\S+).*", "\\1", join2$taxon)
+join$taxon <- sub("^(\\S*\\s+\\S+).*", "\\1", join$taxon)
 # Only 800 differet species left after shortening of the name.
 ```
 
-# Subset only data from 2005 from the table join2005.
-```{r  subset-2005-data, echo=TRUE, message=FALSE}
+# Subset data for specific years
+```{r  subset-data-years, echo=TRUE, message=FALSE}
 # within R and not via SQL query
-join2005 <- subset(join2, date < as.Date("2006-01-01"))
-# join2006 <- subset(join2, (date < as.Date("2007-01-01"))&(date > as.Date("2005-12-31")))
+join2005 <- subset(join, date < as.Date("2006-01-01"))
+join2006 <- subset(join, (date < as.Date("2007-01-01"))&(date > as.Date("2005-12-31")))
+join2007 <- subset(join, (date < as.Date("2008-01-01"))&(date > as.Date("2006-12-31")))
+join2008 <- subset(join, (date < as.Date("2009-01-01"))&(date > as.Date("2007-12-31")))
+join2009 <- subset(join, (date < as.Date("2010-01-01"))&(date > as.Date("2008-12-31")))
+join2010 <- subset(join, (date < as.Date("2011-01-01"))&(date > as.Date("2009-12-31")))
+join2011 <- subset(join, (date < as.Date("2012-01-01"))&(date > as.Date("2010-12-31")))
+join2012 <- subset(join, (date < as.Date("2013-01-01"))&(date > as.Date("2011-12-31")))
+join2013 <- subset(join, (date < as.Date("2014-01-01"))&(date > as.Date("2012-12-31")))
+join2014 <- subset(join, (date < as.Date("2015-01-01"))&(date > as.Date("2013-12-31")))
+join2015 <- subset(join, date > as.Date("2014-12-31"))
 
 ```
 
 # Transform data with reshape2 package to get from long to wide data for the site_id.
 ```{r  transform-data-to-wide, echo=TRUE, message=FALSE}
 
+# Create proper data format
 dia05 <- data.frame(join2005$taxon, join2005$site_id, join2005$date, as.numeric(join2005$cover))
+dia06 <- data.frame(join2006$taxon, join2006$site_id, join2006$date, as.numeric(join2006$cover))
+dia07 <- data.frame(join2007$taxon, join2007$site_id, join2007$date, as.numeric(join2007$cover))
+dia08 <- data.frame(join2008$taxon, join2008$site_id, join2008$date, as.numeric(join2008$cover))
+dia09 <- data.frame(join2009$taxon, join2009$site_id, join2009$date, as.numeric(join2009$cover))
+dia10 <- data.frame(join2010$taxon, join2010$site_id, join2010$date, as.numeric(join2010$cover))
+dia11 <- data.frame(join2011$taxon, join2011$site_id, join2011$date, as.numeric(join2011$cover))
+dia12 <- data.frame(join2012$taxon, join2013$site_id, join2013$date, as.numeric(join2013$cover))
+dia13 <- data.frame(join2013$taxon, join2013$site_id, join2013$date, as.numeric(join2013$cover))
+dia14 <- data.frame(join2014$taxon, join2014$site_id, join2014$date, as.numeric(join2014$cover))
+dia15 <- data.frame(join2015$taxon, join2015$site_id, join2015$date, as.numeric(join2015$cover))
+
+# Delete rows with missing values
+dia05 <- dia05[complete.cases(dia05), ]
+dia08 <- dia08[complete.cases(dia08), ]
+dia09 <- dia09[complete.cases(dia09), ]
+# if conducted for 2012, no samples are left.
+
+
+# Rename the columns
 names(dia05) <- c("taxon", "site_id", "date", "cover" )
-names(dia05)
+names(dia06) <- c("taxon", "site_id", "date", "cover" )
+names(dia07) <- c("taxon", "site_id", "date", "cover" )
+names(dia08) <- c("taxon", "site_id", "date", "cover" )
+names(dia09) <- c("taxon", "site_id", "date", "cover" )
+names(dia10) <- c("taxon", "site_id", "date", "cover" )
+names(dia11) <- c("taxon", "site_id", "date", "cover" )
+names(dia12) <- c("taxon", "site_id", "date", "cover" )
+names(dia13) <- c("taxon", "site_id", "date", "cover" )
+names(dia14) <- c("taxon", "site_id", "date", "cover" )
+names(dia15) <- c("taxon", "site_id", "date", "cover" )
+
+# Aggregate with reshape2
 require(reshape2)
 cast05a <- dcast(dia05, taxon + date ~ site_id, fill = 0)
 
@@ -358,10 +355,39 @@ cast05a <- dcast(dia05, taxon + date ~ site_id, fill = 0)
 # several dates in the year.
 
 
-cast05 <- dcast(dia05, site_id ~ taxon, fill = 0) #amount of presence given
-cast05 <- dcast(dia05, site_id ~ taxon, fill = 0, fun.aggregate = mean) #mean of cover
+cast05 <- dcast(dia05, site_id ~ taxon, fill = 0) # length/amount of presence
+cast05 <- dcast(dia05, site_id ~ taxon, fill = 0, fun.aggregate = mean) # mean of cover
+cast05 <- dcast(dia05, site_id ~ taxon, fill = 0, min) # min of cover
 
-cast05 <-cast05[, -1] # removal of site information.
+#  In 2013 there is only one diatomeen sample and none in the years 2014 and 2015.
+# (That meet the criteria that herbicides were sampled in the same year at the same site.)
+
+# Aggregate with data.table
+require(data.table)
+cast05<- data.table::dcast(dia05, site_id ~ taxon, fill=0, fun=mean)
+cast06<- data.table::dcast(dia06, site_id ~ taxon, fill=0, fun=mean)
+cast07<- data.table::dcast(dia07, site_id ~ taxon, fill=0, fun=mean)
+cast08<- data.table::dcast(dia08, site_id ~ taxon, fill=0, fun=mean)
+cast09<- data.table::dcast(dia09, site_id ~ taxon, fill=0, fun=mean)
+cast10<- data.table::dcast(dia10, site_id ~ taxon, fill=0, fun=mean)
+cast11<- data.table::dcast(dia11, site_id ~ taxon, fill=0, fun=mean)
+cast12<- data.table::dcast(dia12, site_id ~ taxon, fill=0, fun=mean)
+cast13<- data.table::dcast(dia13, site_id ~ taxon, fill=0, fun=mean)
+cast14<- data.table::dcast(dia14, site_id ~ taxon, fill=0, fun=mean)
+cast15<- data.table::dcast(dia15, site_id ~ taxon, fill=0, fun=mean)
+
+# removal of site information
+cast05 <-cast05[, -1] 
+cast06 <-cast06[, -1]
+cast07 <-cast07[, -1] 
+cast08 <-cast08[, -1]
+cast09 <-cast09[, -1] 
+cast10 <-cast10[, -1]
+cast11 <-cast11[, -1] 
+cast12 <-cast12[, -1]
+cast13 <-cast13[, -1] 
+cast14 <-cast14[, -1]
+cast15 <-cast15[, -1] 
 
 
 # aggregation function needed if variables do not identify a single observation for
@@ -375,30 +401,106 @@ cast05 <-cast05[, -1] # removal of site information.
 
 ```{r  remove-rare-species, echo=TRUE, message=FALSE}
 # presence-absence transformation to calculate species number per site
-cast05_pa <-decostand(cast05, "pa")  #, na.rm = TRUE ??
+require(vegan)
+cast05_pa <-decostand(cast05, "pa") 
+cast06_pa <-decostand(cast06, "pa") #works
+cast07_pa <-decostand(cast07, "pa") #works
+cast08_pa <-decostand(cast08, "pa")
+cast09_pa <-decostand(cast09, "pa")
+cast10_pa <-decostand(cast10, "pa") #works
+cast11_pa <-decostand(cast11, "pa") #works
+cast12_pa <-decostand(cast12, "pa")
+# NAs in some cells. There, probably, not cover was measured but abundance/iz_n
+# How many times does this happen?
+sum(is.na(dia05$cover)) #1   # from 1704
+sum(is.na(dia06$cover)) #0   
+sum(is.na(dia07$cover)) #0
+sum(is.na(dia08$cover)) #246 # from 4949
+sum(is.na(dia09$cover)) #981 # from 10581
+sum(is.na(dia10$cover)) #0   
+sum(is.na(dia11$cover)) #0
+sum(is.na(dia12$cover)) #8055 # from 8055
+# try with again with removing all rows that have NAs. (done above)
+
 # calculate sum per species
-spec_sum <- apply(cast05_pa,2,sum)
-sort(spec_sum)
+spec_sum05 <- apply(cast05_pa,2,sum)
+sort(spec_sum05)
+spec_sum06 <- apply(cast06_pa,2,sum)
+sort(spec_sum06)
+spec_sum07 <- apply(cast07_pa,2,sum)
+sort(spec_sum07)
+spec_sum08 <- apply(cast08_pa,2,sum)
+spec_sum09 <- apply(cast09_pa,2,sum)
+spec_sum10 <- apply(cast10_pa,2,sum)
+sort(spec_sum10)
+spec_sum11 <- apply(cast11_pa,2,sum)
+sort(spec_sum11)
 
 
 # remove species that occur at less than 2 sites
 # spec_sum needs to be calculated with number of presence data and here continued with cover data
-spec_fin <- cast05[, ! spec_sum <2]
+spec_fin05 <- cast05[, ! spec_sum05 <2]
+sort(apply(spec_fin05, 2, max))   #check if it worked
+spec_fin06 <- cast06[, ! spec_sum06 <2]
+sort(apply(spec_fin06, 2, max))
+spec_fin07 <- cast07[, ! spec_sum07 <2]
+sort(apply(spec_fin07, 2, max))
+spec_fin08 <- cast08[, ! spec_sum08 <2]
+spec_fin09 <- cast09[, ! spec_sum09 <2]
+spec_fin10 <- cast10[, ! spec_sum10 <2]
+sort(apply(spec_fin10, 2, max))
+spec_fin11 <- cast11[, ! spec_sum11 <2]
+sort(apply(spec_fin11, 2, max))
 
-sort(apply(spec_fin, 2, max))
-# 2 species remain with cover of 0.0 -> Nitzschia sigmoidea + Pinnularia microstauron
-sort(apply(spec_fin, 2, sd))
 
 ```
 
+Conduct DCA to see if axis length indicates unimodal gradient.
 ```{r  dca, echo=TRUE, message=FALSE}
 require(vegan)
-spec_dca<- decorana(spec_fin)
-spec_dca
-
 # axis lenght = SD. For axis length < 3, linear analysis should be used, for axis length >3, unimodal analysis should be performed.
 # If presence-absence data is used: DCA1 length = 2.5
 # If cover data is used: DCA1 length = 3.6 --> unimodal approach would be fine.
+# Don't use decorana-values.
+spec_dca05<- decorana(spec_fin05)
+spec_dca05 #DCA1 length = 3.66
+# summary(spec_dca05, digits=3, origin=TRUE, display="both")
+
+plot(spec_dca05, display="both") 
+# crosses=species, points=sites
+# shnam <- make.cepnames(names(spec_fin)) #abbreaviation of Latin names
+
+spec_dca06<- decorana(spec_fin06)
+spec_dca06 #DCA1 length = 7.48
+
+spec_dca07<- decorana(spec_fin07)
+spec_dca07 #DCA1 length = 4.83
+
+spec_dca08<- decorana(spec_fin08)   # many samples deleted before
+spec_dca08 #DCA1 length = 4.84
+
+spec_dca09<- decorana(spec_fin09)   # many samples deleted before
+spec_dca09 #DCA1 length = 2.39
+
+spec_dca10<- decorana(spec_fin10)
+spec_dca10 #DCA1 length = 4.31
+
+spec_dca11<- decorana(spec_fin11)
+spec_dca11 #DCA1 length = 6.13
+
+# Conducting unimodal analysis would be okay for all years except for 2009.
+```
+Conduct CA
+```{r  ca, echo=TRUE, message=FALSE}
+# conduct CA
+spec_ca <- cca(spec_fin)
+spec_ca
+plot(spec_ca) # species scores as weighted averages of site scores.
+chisq.test(spec_fin/sum(spec_sum))
+# x-squared = inertia from aboce, p-values not important
+plot(spec_ca, scaling =1) #site scores as weighted averages of species scores
+
+
 ```
 
 # Creating a data frame
@@ -453,7 +555,7 @@ Are there any rare species? Marchant (2002) suggests to remove rare species and 
 ```{r  taxon-frequency, echo=TRUE, message=FALSE}
 
 # taxon_count <- table(dia_sam$dv)
-taxon_count <- table(join2$taxon)
+taxon_count <- table(join$taxon)
 # taxon_count <- table(dia_sam$taxon)
 summary(taxon_count)
 taxon_count <-as.data.frame(taxon_count)
@@ -467,7 +569,7 @@ hist(taxon_count$Freq, breaks = 50)
 
 # relative frequency of species that are only present at 1 site
 freq1/freqn*100       # 17.6 % of all species are only present at 1 site
-freq1/nrow(join2)*100 # 0.3 % of all Samples-site combinations represent a species that was sampled only once.
+freq1/nrow(join)*100 # 0.3 % of all Samples-site combinations represent a species that was sampled only once.
 
 
 # Sollte ich seltene Arten weglassen? Wenn ja, welche Arten stufe ich als selten ein?
