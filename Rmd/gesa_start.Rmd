@@ -248,7 +248,12 @@ join = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.date, dsam.taxon
                    ORDER BY dsam.date, dsam.site_id, dsam.taxon
                    ")
 # results in 45980 observations
+
+# Add column with year
 join$year <- as.numeric(format(join$date, '%Y'))
+
+# Add column with month
+join$month <- as.numeric(format(join$date, '%m'))
 
 dbDisconnect(con)
 dbUnloadDriver(drv)
@@ -315,17 +320,17 @@ join2015 <- subset(join, date > as.Date("2014-12-31"))
 ```{r  transform-data-to-wide, echo=TRUE, message=FALSE}
 
 # Create proper data format
-dia05 <- data.frame(join2005$taxon, join2005$site_id, join2005$date, as.numeric(join2005$cover))
-dia06 <- data.frame(join2006$taxon, join2006$site_id, join2006$date, as.numeric(join2006$cover))
-dia07 <- data.frame(join2007$taxon, join2007$site_id, join2007$date, as.numeric(join2007$cover))
-dia08 <- data.frame(join2008$taxon, join2008$site_id, join2008$date, as.numeric(join2008$cover))
-dia09 <- data.frame(join2009$taxon, join2009$site_id, join2009$date, as.numeric(join2009$cover))
-dia10 <- data.frame(join2010$taxon, join2010$site_id, join2010$date, as.numeric(join2010$cover))
-dia11 <- data.frame(join2011$taxon, join2011$site_id, join2011$date, as.numeric(join2011$cover))
-dia12 <- data.frame(join2012$taxon, join2013$site_id, join2013$date, as.numeric(join2013$cover))
-dia13 <- data.frame(join2013$taxon, join2013$site_id, join2013$date, as.numeric(join2013$cover))
-dia14 <- data.frame(join2014$taxon, join2014$site_id, join2014$date, as.numeric(join2014$cover))
-dia15 <- data.frame(join2015$taxon, join2015$site_id, join2015$date, as.numeric(join2015$cover))
+dia05 <- data.frame(join2005$taxon, join2005$site_id, join2005$date, join2005$year, join2005$month, as.numeric(join2005$cover))
+dia06 <- data.frame(join2006$taxon, join2006$site_id, join2006$date, join2006$year, join2006$month, as.numeric(join2006$cover))
+dia07 <- data.frame(join2007$taxon, join2007$site_id, join2007$date, join2007$year, join2007$month, as.numeric(join2007$cover))
+dia08 <- data.frame(join2008$taxon, join2008$site_id, join2008$date, join2008$year, join2008$month, as.numeric(join2008$cover))
+dia09 <- data.frame(join2009$taxon, join2009$site_id, join2009$date, join2009$year, join2009$month, as.numeric(join2009$cover))
+dia10 <- data.frame(join2010$taxon, join2010$site_id, join2010$date, join2010$year, join2010$month, as.numeric(join2010$cover))
+dia11 <- data.frame(join2011$taxon, join2011$site_id, join2011$date, join2011$year, join2011$month, as.numeric(join2011$cover))
+dia12 <- data.frame(join2012$taxon, join2013$site_id, join2013$date, join2012$year, join2012$month, as.numeric(join2013$cover))
+dia13 <- data.frame(join2013$taxon, join2013$site_id, join2013$date, join2013$year, join2013$month, as.numeric(join2013$cover))
+dia14 <- data.frame(join2014$taxon, join2014$site_id, join2014$date, join2014$year, join2014$month, as.numeric(join2014$cover))
+dia15 <- data.frame(join2015$taxon, join2015$site_id, join2015$date, join2015$year, join2015$month, as.numeric(join2015$cover))
 
 # Delete rows with missing values
 dia05 <- dia05[complete.cases(dia05), ]
@@ -336,29 +341,29 @@ dia12 <- dia12[complete.cases(dia12), ]
 
 
 # Rename the columns
-names(dia05) <- c("taxon", "site_id", "date", "cover" )
-names(dia06) <- c("taxon", "site_id", "date", "cover" )
-names(dia07) <- c("taxon", "site_id", "date", "cover" )
-names(dia08) <- c("taxon", "site_id", "date", "cover" )
-names(dia09) <- c("taxon", "site_id", "date", "cover" )
-names(dia10) <- c("taxon", "site_id", "date", "cover" )
-names(dia11) <- c("taxon", "site_id", "date", "cover" )
-names(dia12) <- c("taxon", "site_id", "date", "cover" )
-names(dia13) <- c("taxon", "site_id", "date", "cover" )
-names(dia14) <- c("taxon", "site_id", "date", "cover" )
-names(dia15) <- c("taxon", "site_id", "date", "cover" )
+names(dia05) <- c("taxon", "site_id", "date", "year", "month", "cover" )
+names(dia06) <- c("taxon", "site_id", "date", "year", "month", "cover" )
+names(dia07) <- c("taxon", "site_id", "date", "year", "month", "cover" )
+names(dia08) <- c("taxon", "site_id", "date", "year", "month", "cover" )
+names(dia09) <- c("taxon", "site_id", "date", "year", "month", "cover" )
+names(dia10) <- c("taxon", "site_id", "date", "year", "month", "cover" )
+names(dia11) <- c("taxon", "site_id", "date", "year", "month", "cover" )
+names(dia12) <- c("taxon", "site_id", "date", "year", "month", "cover" )
+names(dia13) <- c("taxon", "site_id", "date", "year", "month", "cover" )
+names(dia14) <- c("taxon", "site_id", "date", "year", "month", "cover" )
+names(dia15) <- c("taxon", "site_id", "date", "year", "month", "cover" )
 
 # Aggregate with reshape2
-require(reshape2)
-cast05a <- dcast(dia05, taxon + date ~ site_id, fill = 0)
+# require(reshape2)
+# cast05a <- dcast(dia05, taxon + date ~ site_id, fill = 0)
 
 # Like this, same species appear several times if it was sampled on different sites on
 # several dates in the year.
 
 
-cast05 <- dcast(dia05, site_id ~ taxon, fill = 0) # length/amount of presence
-cast05 <- dcast(dia05, site_id ~ taxon, fill = 0, fun.aggregate = mean) # mean of cover
-cast05 <- dcast(dia05, site_id ~ taxon, fill = 0, min) # min of cover
+# cast05 <- dcast(dia05, site_id ~ taxon, fill = 0) # length/amount of presence
+# cast05 <- dcast(dia05, site_id ~ taxon, fill = 0, fun.aggregate = mean) # mean of cover
+# cast05 <- dcast(dia05, site_id ~ taxon, fill = 0, min) # min of cover
 
 #  In 2013 there is only one diatomeen sample and none in the years 2014 and 2015.
 # (That meet the criteria that herbicides were sampled in the same year at the same site.)
@@ -372,10 +377,10 @@ cast08<- data.table::dcast(dia08, site_id ~ taxon, fill=0, fun=mean)
 cast09<- data.table::dcast(dia09, site_id ~ taxon, fill=0, fun=mean)
 cast10<- data.table::dcast(dia10, site_id ~ taxon, fill=0, fun=mean)
 cast11<- data.table::dcast(dia11, site_id ~ taxon, fill=0, fun=mean)
-cast12<- data.table::dcast(dia12, site_id ~ taxon, fill=0, fun=mean)
-cast13<- data.table::dcast(dia13, site_id ~ taxon, fill=0, fun=mean)
-cast14<- data.table::dcast(dia14, site_id ~ taxon, fill=0, fun=mean)
-cast15<- data.table::dcast(dia15, site_id ~ taxon, fill=0, fun=mean)
+# cast12<- data.table::dcast(dia12, site_id ~ taxon, fill=0, fun=mean)
+# cast13<- data.table::dcast(dia13, site_id ~ taxon, fill=0, fun=mean)
+# cast14<- data.table::dcast(dia14, site_id ~ taxon, fill=0, fun=mean)
+# cast15<- data.table::dcast(dia15, site_id ~ taxon, fill=0, fun=mean)
 
 # removal of site information
 cast05 <-cast05[, -1] 
@@ -385,10 +390,10 @@ cast08 <-cast08[, -1]
 cast09 <-cast09[, -1] 
 cast10 <-cast10[, -1]
 cast11 <-cast11[, -1] 
-cast12 <-cast12[, -1]
-cast13 <-cast13[, -1] 
-cast14 <-cast14[, -1]
-cast15 <-cast15[, -1] 
+# cast12 <-cast12[, -1]
+# cast13 <-cast13[, -1] 
+# cast14 <-cast14[, -1]
+# cast15 <-cast15[, -1] 
 
 
 # aggregation function needed if variables do not identify a single observation for
@@ -410,8 +415,9 @@ cast08_pa <-decostand(cast08, "pa")
 cast09_pa <-decostand(cast09, "pa")
 cast10_pa <-decostand(cast10, "pa") #works
 cast11_pa <-decostand(cast11, "pa") #works
-cast12_pa <-decostand(cast12, "pa")
+# cast12_pa <-decostand(cast12, "pa")
 # NAs in some cells. There, probably, not cover was measured but abundance/iz_n
+
 # How many times does this happen?
 sum(is.na(dia05$cover)) #1   # from 1704
 sum(is.na(dia06$cover)) #0   
@@ -425,17 +431,17 @@ sum(is.na(dia12$cover)) #8055 # from 8055
 
 # calculate sum per species
 spec_sum05 <- apply(cast05_pa,2,sum)
-sort(spec_sum05)
+# sort(spec_sum05)
 spec_sum06 <- apply(cast06_pa,2,sum)
-sort(spec_sum06)
+# sort(spec_sum06)
 spec_sum07 <- apply(cast07_pa,2,sum)
-sort(spec_sum07)
+# sort(spec_sum07)
 spec_sum08 <- apply(cast08_pa,2,sum)
 spec_sum09 <- apply(cast09_pa,2,sum)
 spec_sum10 <- apply(cast10_pa,2,sum)
-sort(spec_sum10)
+# sort(spec_sum10)
 spec_sum11 <- apply(cast11_pa,2,sum)
-sort(spec_sum11)
+# sort(spec_sum11)
 
 
 # remove species that occur at less than 2 sites
@@ -452,7 +458,6 @@ spec_fin10 <- cast10[, ! spec_sum10 <2]
 sort(apply(spec_fin10, 2, max))
 spec_fin11 <- cast11[, ! spec_sum11 <2]
 sort(apply(spec_fin11, 2, max))
-
 
 ```
 
@@ -537,8 +542,315 @@ barplot(freqb_tab, xlab ="Year", ylab ="Amount of samples")
 
 ```
 
+```{r  sampling-frequency-per-year, echo=TRUE, message=FALSE}
+### 2005 ###
+n05a1 <-nrow(join[join$year=="2005" & join$month=="1", ]) 
+n05a2 <-nrow(join[join$year=="2005" & join$month=="2", ])
+n05a3 <-nrow(join[join$year=="2005" & join$month=="3", ])
+n05a4 <-nrow(join[join$year=="2005" & join$month=="4", ])
+n05a5 <-nrow(join[join$year=="2005" & join$month=="5", ])
+n05a6 <-nrow(join[join$year=="2005" & join$month=="6", ])
+n05a7 <-nrow(join[join$year=="2005" & join$month=="7", ])
+n05a8 <-nrow(join[join$year=="2005" & join$month=="8", ])
+n05a9 <-nrow(join[join$year=="2005" & join$month=="9", ])
+n05a10 <-nrow(join[join$year=="2005" & join$month=="10", ])
+n05a11 <-nrow(join[join$year=="2005" & join$month=="11", ])
+n05a12 <-nrow(join[join$year=="2005" & join$month=="12", ])
+
+freq05a <- c(n05a1, n05a2, n05a3, n05a4, n05a5, n05a6, n05a7, n05a8, n05a9, n05a10, n05a11, n05a12) 
+
+month <- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12")
+
+#Complete data set
+freq05a_tab <- rbind(freq05a)
+colnames(freq05a_tab) <- month
+barplot(freq05a_tab, xlab ="Month", ylab ="Amount of samples", main="Sampling frequency in 2005 per month")
+
+# Rows removed were cover = NA
+n05b1 <- nrow(dia05[dia05$month=="1",]) 
+n05b2 <- nrow(dia05[dia05$month=="2",])  
+n05b3 <- nrow(dia05[dia05$month=="3",])  
+n05b4 <- nrow(dia05[dia05$month=="4",])  
+n05b5 <- nrow(dia05[dia05$month=="5",])  
+n05b6 <- nrow(dia05[dia05$month=="6",])  
+n05b7 <- nrow(dia05[dia05$month=="7",])  
+n05b8 <- nrow(dia05[dia05$month=="8",])  
+n05b9 <- nrow(dia05[dia05$month=="9",])  
+n05b10 <- nrow(dia05[dia05$month=="10",])  
+n05b11 <- nrow(dia05[dia05$month=="11",])  
+n05b12 <- nrow(dia05[dia05$month=="12",])  
+
+freq05b <- c(n05b1, n05b2, n05b3, n05b4, n05b5, n05b6, n05b7, n05b8, n05b9, n05b10, n05b11, n05b12)
+
+freq05b_tab <- rbind(freq05b)
+colnames(freq05b_tab) <- month
+barplot(freq05b_tab, xlab ="Month", ylab ="Amount of samples", main="Sampling frequency in 2005 per month")
+
+### 2006 ###
+n06a1 <-nrow(join[join$year=="2006" & join$month=="1", ]) 
+n06a2 <-nrow(join[join$year=="2006" & join$month=="2", ])
+n06a3 <-nrow(join[join$year=="2006" & join$month=="3", ])
+n06a4 <-nrow(join[join$year=="2006" & join$month=="4", ])
+n06a5 <-nrow(join[join$year=="2006" & join$month=="5", ])
+n06a6 <-nrow(join[join$year=="2006" & join$month=="6", ])
+n06a7 <-nrow(join[join$year=="2006" & join$month=="7", ])
+n06a8 <-nrow(join[join$year=="2006" & join$month=="8", ])
+n06a9 <-nrow(join[join$year=="2006" & join$month=="9", ])
+n06a10 <-nrow(join[join$year=="2006" & join$month=="10", ])
+n06a11 <-nrow(join[join$year=="2006" & join$month=="11", ])
+n06a12 <-nrow(join[join$year=="2006" & join$month=="12", ])
+
+freq06a <- c(n06a1, n06a2, n06a3, n06a4, n06a5, n06a6, n06a7, n06a8, n06a9, n06a10, n06a11, n06a12) 
+
+month <- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12")
+
+#Complete data set
+freq06a_tab <- rbind(freq06a)
+colnames(freq06a_tab) <- month
+barplot(freq06a_tab, xlab ="Month", ylab ="Amount of samples", main="Sampling frequency in 2006 per month")
+
+# Rows removed were cover = NA
+n06b1 <- nrow(dia06[dia06$month=="1",]) 
+n06b2 <- nrow(dia06[dia06$month=="2",])  
+n06b3 <- nrow(dia06[dia06$month=="3",])  
+n06b4 <- nrow(dia06[dia06$month=="4",])  
+n06b5 <- nrow(dia06[dia06$month=="5",])  
+n06b6 <- nrow(dia06[dia06$month=="6",])  
+n06b7 <- nrow(dia06[dia06$month=="7",])  
+n06b8 <- nrow(dia06[dia06$month=="8",])  
+n06b9 <- nrow(dia06[dia06$month=="9",])  
+n06b10 <- nrow(dia06[dia06$month=="10",])  
+n06b11 <- nrow(dia06[dia06$month=="11",])  
+n06b12 <- nrow(dia06[dia06$month=="12",])  
+
+freq06b <- c(n06b1, n06b2, n06b3, n06b4, n06b5, n06b6, n06b7, n06b8, n06b9, n06b10, n06b11, n06b12)
+
+freq06b_tab <- rbind(freq06b)
+colnames(freq06b_tab) <- month
+barplot(freq06b_tab, xlab ="Month", ylab ="Amount of samples", main="Sampling frequency in 2006 per month")
+
+### 2007 ###
+n07a1 <-nrow(join[join$year=="2007" & join$month=="1", ]) 
+n07a2 <-nrow(join[join$year=="2007" & join$month=="2", ])
+n07a3 <-nrow(join[join$year=="2007" & join$month=="3", ])
+n07a4 <-nrow(join[join$year=="2007" & join$month=="4", ])
+n07a5 <-nrow(join[join$year=="2007" & join$month=="5", ])
+n07a6 <-nrow(join[join$year=="2007" & join$month=="6", ])
+n07a7 <-nrow(join[join$year=="2007" & join$month=="7", ])
+n07a8 <-nrow(join[join$year=="2007" & join$month=="8", ])
+n07a9 <-nrow(join[join$year=="2007" & join$month=="9", ])
+n07a10 <-nrow(join[join$year=="2007" & join$month=="10", ])
+n07a11 <-nrow(join[join$year=="2007" & join$month=="11", ])
+n07a12 <-nrow(join[join$year=="2007" & join$month=="12", ])
+
+freq07a <- c(n07a1, n07a2, n07a3, n07a4, n07a5, n07a6, n07a7, n07a8, n07a9, n07a10, n07a11, n07a12) 
+
+month <- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12")
+
+#Complete data set
+freq07a_tab <- rbind(freq07a)
+colnames(freq07a_tab) <- month
+barplot(freq07a_tab, xlab ="Month", ylab ="Amount of samples", main="Sampling frequency in 2007 per month")
+
+# Rows removed were cover = NA
+n07b1 <- nrow(dia07[dia07$month=="1",]) 
+n07b2 <- nrow(dia07[dia07$month=="2",])  
+n07b3 <- nrow(dia07[dia07$month=="3",])  
+n07b4 <- nrow(dia07[dia07$month=="4",])  
+n07b5 <- nrow(dia07[dia07$month=="5",])  
+n07b6 <- nrow(dia07[dia07$month=="6",])  
+n07b7 <- nrow(dia07[dia07$month=="7",])  
+n07b8 <- nrow(dia07[dia07$month=="8",])  
+n07b9 <- nrow(dia07[dia07$month=="9",])  
+n07b10 <- nrow(dia07[dia07$month=="10",])  
+n07b11 <- nrow(dia07[dia07$month=="11",])  
+n07b12 <- nrow(dia07[dia07$month=="12",])  
+
+freq07b <- c(n07b1, n07b2, n07b3, n07b4, n07b5, n07b6, n07b7, n07b8, n07b9, n07b10, n07b11, n07b12)
+
+freq07b_tab <- rbind(freq07b)
+colnames(freq07b_tab) <- month
+barplot(freq07b_tab, xlab ="Month", ylab ="Amount of samples", main="Sampling frequency in 2007 per month")
+
+### 2008 ###
+n08a1 <-nrow(join[join$year=="2008" & join$month=="1", ]) 
+n08a2 <-nrow(join[join$year=="2008" & join$month=="2", ])
+n08a3 <-nrow(join[join$year=="2008" & join$month=="3", ])
+n08a4 <-nrow(join[join$year=="2008" & join$month=="4", ])
+n08a5 <-nrow(join[join$year=="2008" & join$month=="5", ])
+n08a6 <-nrow(join[join$year=="2008" & join$month=="6", ])
+n08a7 <-nrow(join[join$year=="2008" & join$month=="7", ])
+n08a8 <-nrow(join[join$year=="2008" & join$month=="8", ])
+n08a9 <-nrow(join[join$year=="2008" & join$month=="9", ])
+n08a10 <-nrow(join[join$year=="2008" & join$month=="10", ])
+n08a11 <-nrow(join[join$year=="2008" & join$month=="11", ])
+n08a12 <-nrow(join[join$year=="2008" & join$month=="12", ])
+
+freq08a <- c(n08a1, n08a2, n08a3, n08a4, n08a5, n08a6, n08a7, n08a8, n08a9, n08a10, n08a11, n08a12) 
+
+month <- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12")
+
+#Complete data set
+freq08a_tab <- rbind(freq08a)
+colnames(freq08a_tab) <- month
+barplot(freq08a_tab, xlab ="Month", ylab ="Amount of samples", main="Sampling frequency in 2008 per month")
+
+# Rows removed were cover = NA
+n08b1 <- nrow(dia08[dia08$month=="1",]) 
+n08b2 <- nrow(dia08[dia08$month=="2",])  
+n08b3 <- nrow(dia08[dia08$month=="3",])  
+n08b4 <- nrow(dia08[dia08$month=="4",])  
+n08b5 <- nrow(dia08[dia08$month=="5",])  
+n08b6 <- nrow(dia08[dia08$month=="6",])  
+n08b7 <- nrow(dia08[dia08$month=="7",])  
+n08b8 <- nrow(dia08[dia08$month=="8",])  
+n08b9 <- nrow(dia08[dia08$month=="9",])  
+n08b10 <- nrow(dia08[dia08$month=="10",])  
+n08b11 <- nrow(dia08[dia08$month=="11",])  
+n08b12 <- nrow(dia08[dia08$month=="12",])  
+
+freq08b <- c(n08b1, n08b2, n08b3, n08b4, n08b5, n08b6, n08b7, n08b8, n08b9, n08b10, n08b11, n08b12)
+
+freq08b_tab <- rbind(freq08b)
+colnames(freq08b_tab) <- month
+barplot(freq08b_tab, xlab ="Month", ylab ="Amount of samples", main="Sampling frequency in 2008 per month")
+
+### 2009 ###
+n09a1 <-nrow(join[join$year=="2009" & join$month=="1", ]) 
+n09a2 <-nrow(join[join$year=="2009" & join$month=="2", ])
+n09a3 <-nrow(join[join$year=="2009" & join$month=="3", ])
+n09a4 <-nrow(join[join$year=="2009" & join$month=="4", ])
+n09a5 <-nrow(join[join$year=="2009" & join$month=="5", ])
+n09a6 <-nrow(join[join$year=="2009" & join$month=="6", ])
+n09a7 <-nrow(join[join$year=="2009" & join$month=="7", ])
+n09a8 <-nrow(join[join$year=="2009" & join$month=="8", ])
+n09a9 <-nrow(join[join$year=="2009" & join$month=="9", ])
+n09a10 <-nrow(join[join$year=="2009" & join$month=="10", ])
+n09a11 <-nrow(join[join$year=="2009" & join$month=="11", ])
+n09a12 <-nrow(join[join$year=="2009" & join$month=="12", ])
+
+freq09a <- c(n09a1, n09a2, n09a3, n09a4, n09a5, n09a6, n09a7, n09a8, n09a9, n09a10, n09a11, n09a12) 
+
+month <- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12")
+
+#Complete data set
+freq09a_tab <- rbind(freq09a)
+colnames(freq09a_tab) <- month
+barplot(freq09a_tab, xlab ="Month", ylab ="Amount of samples", main="Sampling frequency in 2009 per month")
+
+# Rows removed were cover = NA
+n09b1 <- nrow(dia09[dia09$month=="1",]) 
+n09b2 <- nrow(dia09[dia09$month=="2",])  
+n09b3 <- nrow(dia09[dia09$month=="3",])  
+n09b4 <- nrow(dia09[dia09$month=="4",])  
+n09b5 <- nrow(dia09[dia09$month=="5",])  
+n09b6 <- nrow(dia09[dia09$month=="6",])  
+n09b7 <- nrow(dia09[dia09$month=="7",])  
+n09b8 <- nrow(dia09[dia09$month=="8",])  
+n09b9 <- nrow(dia09[dia09$month=="9",])  
+n09b10 <- nrow(dia09[dia09$month=="10",])  
+n09b11 <- nrow(dia09[dia09$month=="11",])  
+n09b12 <- nrow(dia09[dia09$month=="12",])  
+
+freq09b <- c(n09b1, n09b2, n09b3, n09b4, n09b5, n09b6, n09b7, n09b8, n09b9, n09b10, n09b11, n09b12)
+
+freq09b_tab <- rbind(freq09b)
+colnames(freq09b_tab) <- month
+barplot(freq09b_tab, xlab ="Month", ylab ="Amount of samples", main="Sampling frequency in 2009 per month")
+
+### 2010 ###
+n10a1 <-nrow(join[join$year=="2010" & join$month=="1", ]) 
+n10a2 <-nrow(join[join$year=="2010" & join$month=="2", ])
+n10a3 <-nrow(join[join$year=="2010" & join$month=="3", ])
+n10a4 <-nrow(join[join$year=="2010" & join$month=="4", ])
+n10a5 <-nrow(join[join$year=="2010" & join$month=="5", ])
+n10a6 <-nrow(join[join$year=="2010" & join$month=="6", ])
+n10a7 <-nrow(join[join$year=="2010" & join$month=="7", ])
+n10a8 <-nrow(join[join$year=="2010" & join$month=="8", ])
+n10a9 <-nrow(join[join$year=="2010" & join$month=="9", ])
+n10a10 <-nrow(join[join$year=="2010" & join$month=="10", ])
+n10a11 <-nrow(join[join$year=="2010" & join$month=="11", ])
+n10a12 <-nrow(join[join$year=="2010" & join$month=="12", ])
+
+freq10a <- c(n10a1, n10a2, n10a3, n10a4, n10a5, n10a6, n10a7, n10a8, n10a9, n10a10, n10a11, n10a12) 
+
+month <- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12")
+
+#Complete data set
+freq10a_tab <- rbind(freq10a)
+colnames(freq10a_tab) <- month
+barplot(freq10a_tab, xlab ="Month", ylab ="Amount of samples", main="Sampling frequency in 2010 per month")
+
+# Rows removed were cover = NA
+n10b1 <- nrow(dia10[dia10$month=="1",]) 
+n10b2 <- nrow(dia10[dia10$month=="2",])  
+n10b3 <- nrow(dia10[dia10$month=="3",])  
+n10b4 <- nrow(dia10[dia10$month=="4",])  
+n10b5 <- nrow(dia10[dia10$month=="5",])  
+n10b6 <- nrow(dia10[dia10$month=="6",])  
+n10b7 <- nrow(dia10[dia10$month=="7",])  
+n10b8 <- nrow(dia10[dia10$month=="8",])  
+n10b9 <- nrow(dia10[dia10$month=="9",])  
+n10b10 <- nrow(dia10[dia10$month=="10",])  
+n10b11 <- nrow(dia10[dia10$month=="11",])  
+n10b12 <- nrow(dia10[dia10$month=="12",])  
+
+freq10b <- c(n10b1, n10b2, n10b3, n10b4, n10b5, n10b6, n10b7, n10b8, n10b9, n10b10, n10b11, n10b12)
+
+freq10b_tab <- rbind(freq10b)
+colnames(freq10b_tab) <- month
+barplot(freq10b_tab, xlab ="Month", ylab ="Amount of samples", main="Sampling frequency in 2010 per month")
+
+### 2011 ###
+n11a1 <-nrow(join[join$year=="2011" & join$month=="1", ]) 
+n11a2 <-nrow(join[join$year=="2011" & join$month=="2", ])
+n11a3 <-nrow(join[join$year=="2011" & join$month=="3", ])
+n11a4 <-nrow(join[join$year=="2011" & join$month=="4", ])
+n11a5 <-nrow(join[join$year=="2011" & join$month=="5", ])
+n11a6 <-nrow(join[join$year=="2011" & join$month=="6", ])
+n11a7 <-nrow(join[join$year=="2011" & join$month=="7", ])
+n11a8 <-nrow(join[join$year=="2011" & join$month=="8", ])
+n11a9 <-nrow(join[join$year=="2011" & join$month=="9", ])
+n11a10 <-nrow(join[join$year=="2011" & join$month=="10", ])
+n11a11 <-nrow(join[join$year=="2011" & join$month=="11", ])
+n11a12 <-nrow(join[join$year=="2011" & join$month=="12", ])
+
+freq11a <- c(n11a1, n11a2, n11a3, n11a4, n11a5, n11a6, n11a7, n11a8, n11a9, n11a10, n11a11, n11a12) 
+
+month <- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12")
+
+#Complete data set
+freq11a_tab <- rbind(freq11a)
+colnames(freq11a_tab) <- month
+barplot(freq11a_tab, xlab ="Month", ylab ="Amount of samples", main="Sampling frequency in 2011 per month")
+
+# Rows removed were cover = NA
+n11b1 <- nrow(dia11[dia11$month=="1",]) 
+n11b2 <- nrow(dia11[dia11$month=="2",])  
+n11b3 <- nrow(dia11[dia11$month=="3",])  
+n11b4 <- nrow(dia11[dia11$month=="4",])  
+n11b5 <- nrow(dia11[dia11$month=="5",])  
+n11b6 <- nrow(dia11[dia11$month=="6",])  
+n11b7 <- nrow(dia11[dia11$month=="7",])  
+n11b8 <- nrow(dia11[dia11$month=="8",])  
+n11b9 <- nrow(dia11[dia11$month=="9",])  
+n11b10 <- nrow(dia11[dia11$month=="10",])  
+n11b11 <- nrow(dia11[dia11$month=="11",])  
+n11b12 <- nrow(dia11[dia11$month=="12",])  
+
+freq11b <- c(n11b1, n11b2, n11b3, n11b4, n11b5, n11b6, n11b7, n11b8, n11b9, n11b10, n11b11, n11b12)
+
+freq11b_tab <- rbind(freq11b)
+colnames(freq11b_tab) <- month
+barplot(freq11b_tab, xlab ="Month", ylab ="Amount of samples", main="Sampling frequency in 2011 per month")
+
+
+
+```
+
 Conduct CA
 ```{r  ca, echo=TRUE, message=FALSE}
+require(vegan)
 # conduct CA
 spec_ca <- cca(spec_fin)
 spec_ca
@@ -547,6 +859,22 @@ chisq.test(spec_fin/sum(spec_sum))
 # x-squared = inertia from aboce, p-values not important
 plot(spec_ca, scaling =1) #site scores as weighted averages of species scores
 
+# CA for all years seperately
+spec_ca06 <- cca(spec_fin05)
+plot(spec_ca05)
+spec_ca06 <- cca(spec_fin06)
+plot(spec_ca06)
+spec_ca07 <- cca(spec_fin07)
+plot(spec_ca07)
+spec_ca08 <- cca(spec_fin08)
+plot(spec_ca08)
+spec_ca09 <- cca(spec_fin09)
+plot(spec_ca09)
+spec_ca10 <- cca(spec_fin10)
+plot(spec_ca10)
+spec_ca11 <- cca(spec_fin11)
+plot(spec_ca11)
+# Arch effect not so visible, mostl< only on one side. Outliers make interpretation hard.
 
 ```
 
