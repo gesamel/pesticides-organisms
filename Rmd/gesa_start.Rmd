@@ -91,106 +91,8 @@ dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
 
-## Question: How to compare diatom and psm sampling sites?
-Where were samples taken at the same location?
-
-Which column should I use to compare both datasets?
-Random check if site_id exists in dia_sam.
-Result: site_id is not the same in psm_samples and dia_sam.
-Maybe labelling system is still the same, samples were just not always taken at same location?
-```{r echo=TRUE, message=FALSE}
-# Random site_id taken from psm_samples
-dia_sam[dia_sam$site_id=="BW_10001",] #no result
-dia_sam[dia_sam$site_id=="RP_10002",] #no results
-# Random site_id taken from dia_samples as a cross-check if code is correct.
-dia_sam[dia_sam$site_id=="BW_AI025.00",] #185 results
-
-```
-Is site_name, site_id and site_nr the same in psm_sites dataset? 
-Find out by counting distinct occurence of them.
-Result: site_id and site_name does not mean the same.
-Site_id and site_nr might be approximately the same.
-``` {r echo=TRUE, message=FALSE}
-# Complete data set has to be queried before!!
-psm_siteid_list <- unique(psm_sites$site_id)
-nrow(as.data.frame(psm_siteid_list)) # 3116 different entries for site_id in psm_sites
-
-psm_sitename_list <- unique(psm_sites$site_name)
-nrow(as.data.frame(psm_sitename_list)) # 2746 different entries for site_name in psm_sites
-
-psm_sitenr_list <- unique(psm_sites$site_nr)
-nrow(as.data.frame(psm_sitenr_list)) # 3114 different entries for site_nr in psm_sites
-
-```
-
-Random check if site_nr in dia_sites and psm_sites are the same.
-Result: site_nr in psm_sites and dia_sites are not the same.
-Maybe labelling system is still the same, samples were just not always taken at same location?
-Check the other way around. Are site_nr of dia_sites found in psm_sites?
-Result: Positive. Dia samples were probably not taken at all psm sampling locations.
-```{r echo=TRUE, message=FALSE}
-# Random site_nr taken from psm_sites
-dia_sites[dia_sites$site_nr=="CAC029",] # no results
-dia_sites[dia_sites$site_nr=="21094",] # no results
-dia_sites[dia_sites$site_nr=="CEN901",] # no results
-# Random site_nr taken from dia_sites as a cross-check to see if code is correct.
-dia_sites[dia_sites$site_nr=="CEZ016",] # 1 result
-
-# Check the other way around. Are site_nr of dia_sites found in psm_sites? YES.
-psm_sites[psm_sites$site_nr=="CEZ016",] # 1 result
-dia_sites[dia_sites$site_nr=="CEZ016",] # 1 result
-psm_sites[psm_sites$site_nr=="CKO317",] # 1 result
-dia_sites[dia_sites$site_nr=="CKO317",] # 1 result
-psm_sites[psm_sites$site_nr=="21081",] # 1 result
-dia_sites[dia_sites$site_nr=="21081",] # no results
-psm_sites[psm_sites$site_nr=="105703",] # 1 result
-dia_sites[dia_sites$site_nr=="105703",] # 1 result
-
-
-```
-
-Random check if site_id in dia_sites and psm_sites are the same.
-Result: NO. Only sometimes it works.
-``` {r echo=TRUE, message=FALSE}
-psm_sites[psm_sites$site_id=="BW_CEZ016",] # 1 result
-dia_sites[dia_sites$site_id=="BW_CEZ016",] # no result
-psm_sites[psm_sites$site_id=="BW_CKO317",] # 1 result
-dia_sites[dia_sites$site_id=="BW_CKO317",] # no result
-psm_sites[psm_sites$site_id=="BY_3390",] # 1 result
-dia_sites[dia_sites$site_id=="BY_3390",] # 1 result
-
-
-```
-# Result
-site_id cannot be used to connect psm_sites and dia_sites. Instead site_nr must be used
-since attribut is found in both tables.
-
 
 ## Compare both sample datasets
-Filter sites where diatom and herbicide data was measured in the same year.
-``` {r compare-sample-datasets, echo=TRUE, message=FALSE}
-# Join both sample data frames. Add a column identifying which source each row comes from.
-dia_sam$table <- "dia"
-psm_samples$table <- "psm"
-dia_sam_bind <- dia_sam[,c("date", "site_id", "table")]
-psm_sam_bind <- psm_samples[,c("date", "site_id", "table")]
-samples_bind <- rbind(dia_sam_bind,psm_sam_bind) # combine both sample tables
-
-```
-
-Create data frames with samples only from 2005.
-``` {r create-year-column, echo=TRUE, message=FALSE}
-# Create year column from date column
-dia_sam$year <- as.numeric(format(dia_sam$date,'%Y'))
-psm_samples$year <- as.numeric(format(psm_samples$date,'%Y'))
-
-# Create data frames with samples only from 2005
-dia_sam_05 <- dia_sam[dia_sam$year=="2005",]
-psm_sam_05 <- psm_samples[psm_samples$year=="2005",]
-
-# common <- intersect(dia_sam_05[,"site_id"], psm_sam_05[,"site_id"]) # results in empty data
-
-```
 # Want to compare tables on year and site_id:
 Extract year from date.
 ```{r  extract-year-from-date echo=TRUE, message=FALSE}
@@ -255,6 +157,12 @@ join$year <- as.numeric(format(join$date, '%Y'))
 # Add column with month
 join$month <- as.numeric(format(join$date, '%m'))
 
+# Shorten taxon name
+join$taxon <- sub("^(\\S*\\s+\\S+).*", "\\1", join$taxon)
+
+join$cover <- round(join$cover, digits = 4)
+
+
 dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
@@ -295,7 +203,7 @@ genus_list
 nrow(as.data.frame(genus_list))
 
 # Keep only Genus + species name.
-join$taxon <- sub("^(\\S*\\s+\\S+).*", "\\1", join$taxon)
+# join$taxon <- sub("^(\\S*\\s+\\S+).*", "\\1", join$taxon)
 # Only 800 differet species left after shortening of the name.
 ```
 
@@ -370,17 +278,87 @@ names(dia15) <- c("taxon", "site_id", "date", "year", "month", "cover" )
 
 # Aggregate with data.table
 require(data.table)
-cast05<- data.table::dcast(dia05, site_id ~ taxon, fill=0, fun=mean)
-cast06<- data.table::dcast(dia06, site_id ~ taxon, fill=0, fun=mean)
-cast07<- data.table::dcast(dia07, site_id ~ taxon, fill=0, fun=mean)
-cast08<- data.table::dcast(dia08, site_id ~ taxon, fill=0, fun=mean)
-cast09<- data.table::dcast(dia09, site_id ~ taxon, fill=0, fun=mean)
-cast10<- data.table::dcast(dia10, site_id ~ taxon, fill=0, fun=mean)
-cast11<- data.table::dcast(dia11, site_id ~ taxon, fill=0, fun=mean)
+#cast05<- data.table::dcast(dia05, site_id ~ taxon, fill=0, fun=mean)
+#cast06<- data.table::dcast(dia06, site_id ~ taxon, fill=0, fun=mean)
+#cast07<- data.table::dcast(dia07, site_id ~ taxon, fill=0, fun=mean)
+#cast08<- data.table::dcast(dia08, site_id ~ taxon, fill=0, fun=mean)
+#cast09<- data.table::dcast(dia09, site_id ~ taxon, fill=0, fun=mean)
+#cast10<- data.table::dcast(dia10, site_id ~ taxon, fill=0, fun=mean)
+#cast11<- data.table::dcast(dia11, site_id ~ taxon, fill=0, fun=mean)
+
 # cast12<- data.table::dcast(dia12, site_id ~ taxon, fill=0, fun=mean)
 # cast13<- data.table::dcast(dia13, site_id ~ taxon, fill=0, fun=mean)
 # cast14<- data.table::dcast(dia14, site_id ~ taxon, fill=0, fun=mean)
 # cast15<- data.table::dcast(dia15, site_id ~ taxon, fill=0, fun=mean)
+
+cast05<- data.table::dcast(dia05, site_id ~ taxon, fill=0, fun=min)
+cast06<- data.table::dcast(dia06, site_id ~ taxon, fill=0, fun=min)
+cast07<- data.table::dcast(dia07, site_id ~ taxon, fill=0, fun=min)
+cast08<- data.table::dcast(dia08, site_id ~ taxon, fill=0, fun=min)
+cast09<- data.table::dcast(dia09, site_id ~ taxon, fill=0, fun=min)
+cast10<- data.table::dcast(dia10, site_id ~ taxon, fill=0, fun=min)
+cast11<- data.table::dcast(dia11, site_id ~ taxon, fill=0, fun=min)
+
+# Calculating the 5th percentile of each cover entry
+
+cov5th_05 <- select(join_cov, year, taxon,site_id, cover) %>%
+  filter(year==2005) %>%
+  group_by(site_id, taxon) %>%
+  summarise('5 %' = quantile(cover, probs=0.05))  %>%
+  as.data.frame()
+
+cov5th_06 <- select(join_cov, year, taxon,site_id, cover) %>%
+  filter(year==2006) %>%
+  group_by(site_id, taxon) %>%
+  summarise('5 %' = quantile(cover, probs=0.05))  %>%
+  as.data.frame()
+
+cov5th_07 <- select(join_cov, year, taxon,site_id, cover) %>%
+  filter(year==2007) %>%
+  group_by(site_id, taxon) %>%
+  summarise('5 %' = quantile(cover, probs=0.05))  %>%
+  as.data.frame()
+
+cov5th_08 <- select(join_cov, year, taxon,site_id, cover) %>%
+  filter(year==2008) %>%
+  group_by(site_id, taxon) %>%
+  summarise('5 %' = quantile(cover, probs=0.05))  %>%
+  as.data.frame()
+
+cov5th_09 <- select(join_cov, year, taxon,site_id, cover) %>%
+  filter(year==2009) %>%
+  group_by(site_id, taxon) %>%
+  summarise('5 %' = quantile(cover, probs=0.05))  %>%
+  as.data.frame()
+
+cov5th_10 <- select(join_cov, year, taxon,site_id, cover) %>%
+  filter(year==2010) %>%
+  group_by(site_id, taxon) %>%
+  summarise('5 %' = quantile(cover, probs=0.05))  %>%
+  as.data.frame()
+
+cov5th_11 <- select(join_cov, year, taxon,site_id, cover) %>%
+  filter(year==2011) %>%
+  group_by(site_id, taxon) %>%
+  summarise('5 %' = quantile(cover, probs=0.05))  %>%
+  as.data.frame()
+
+cov5th_12 <- select(join_cov, year, taxon,site_id, cover) %>%
+  filter(year==2012) %>%
+  group_by(site_id, taxon) %>%
+  summarise('5 %' = quantile(cover, probs=0.05))  %>%
+  as.data.frame()
+# wieso sind auf einmal so viele Werte für 2015 da? Eigentlich sollten die cover = na werte rausgelöscht sein.
+
+cast05 <-data.table::dcast(cov5th_05, site_id ~ taxon, fill =0)
+cast06 <-data.table::dcast(cov5th_06, site_id ~ taxon, fill =0)
+cast07 <-data.table::dcast(cov5th_07, site_id ~ taxon, fill =0)
+cast08 <-data.table::dcast(cov5th_08, site_id ~ taxon, fill =0)
+cast09 <-data.table::dcast(cov5th_09, site_id ~ taxon, fill =0)
+cast10 <-data.table::dcast(cov5th_10, site_id ~ taxon, fill =0)
+cast11 <-data.table::dcast(cov5th_11, site_id ~ taxon, fill =0)
+cast12 <-data.table::dcast(cov5th_12, site_id ~ taxon, fill =0)
+
 
 # removal of site information
 cast05 <-cast05[, -1] 
@@ -390,18 +368,11 @@ cast08 <-cast08[, -1]
 cast09 <-cast09[, -1] 
 cast10 <-cast10[, -1]
 cast11 <-cast11[, -1] 
-# cast12 <-cast12[, -1]
+cast12 <-cast12[, -1]
 # cast13 <-cast13[, -1] 
 # cast14 <-cast14[, -1]
 # cast15 <-cast15[, -1] 
 
-
-# aggregation function needed if variables do not identify a single observation for
-# each output cell. Defaults to length (with a message) if needed but not specified.
-# eg Achnanthes minutissima var. minutissima is present twice at site_id NW_137315
-# Answer: Result of if same site was sampled twice in one year.
-
-# dcast ( tab, taxon ~ site_id + year ) would also be possible
 ```
 
 
@@ -415,7 +386,7 @@ cast08_pa <-decostand(cast08, "pa")
 cast09_pa <-decostand(cast09, "pa")
 cast10_pa <-decostand(cast10, "pa") #works
 cast11_pa <-decostand(cast11, "pa") #works
-# cast12_pa <-decostand(cast12, "pa")
+cast12_pa <-decostand(cast12, "pa")
 # NAs in some cells. There, probably, not cover was measured but abundance/iz_n
 
 # How many times does this happen?
@@ -447,17 +418,18 @@ spec_sum11 <- apply(cast11_pa,2,sum)
 # remove species that occur at less than 2 sites
 # spec_sum needs to be calculated with number of presence data and here continued with cover data
 spec_fin05 <- cast05[, ! spec_sum05 <2]
-sort(apply(spec_fin05, 2, max))   #check if it worked
+#sort(apply(spec_fin05, 2, max))   #check if it worked
 spec_fin06 <- cast06[, ! spec_sum06 <2]
-sort(apply(spec_fin06, 2, max))
+# sort(apply(spec_fin06, 2, max))
 spec_fin07 <- cast07[, ! spec_sum07 <2]
-sort(apply(spec_fin07, 2, max))
+# sort(apply(spec_fin07, 2, max))
 spec_fin08 <- cast08[, ! spec_sum08 <2]
 spec_fin09 <- cast09[, ! spec_sum09 <2]
 spec_fin10 <- cast10[, ! spec_sum10 <2]
-sort(apply(spec_fin10, 2, max))
+# sort(apply(spec_fin10, 2, max))
 spec_fin11 <- cast11[, ! spec_sum11 <2]
-sort(apply(spec_fin11, 2, max))
+# sort(apply(spec_fin11, 2, max))
+# spec_fin12 <- cast12[, ! spec_sum12 <2]
 
 ```
 
@@ -466,10 +438,11 @@ Conduct DCA to see if axis length indicates unimodal gradient.
 require(vegan)
 # axis lenght = SD. For axis length < 3, linear analysis should be used, for axis length >3, unimodal analysis should be performed.
 # If presence-absence data is used: DCA1 length = 2.5
-# If cover data is used: DCA1 length = 3.6 --> unimodal approach would be fine.
+# If cover data (mean) is used: DCA1 length = 3.6 --> unimodal approach would be fine.
+
 # Don't use decorana-values.
 spec_dca05<- decorana(spec_fin05)
-spec_dca05 #DCA1 length = 3.66
+spec_dca05 #DCA1 length = 3.66 (mean);  = 3.63 (min); = 3.2 (5%)
 # summary(spec_dca05, digits=3, origin=TRUE, display="both")
 
 plot(spec_dca05, display="both") 
@@ -477,30 +450,31 @@ plot(spec_dca05, display="both")
 # shnam <- make.cepnames(names(spec_fin)) #abbreaviation of Latin names
 
 spec_dca06<- decorana(spec_fin06)
-spec_dca06 #DCA1 length = 7.48
+spec_dca06 #DCA1 length = 7.48 (mean); = 7.56 (min); = 7.57 (5%)
 plot(spec_dca06, display="both")
 
 spec_dca07<- decorana(spec_fin07)
-spec_dca07 #DCA1 length = 4.83
+spec_dca07 #DCA1 length = 4.83 (mean); =4.69 (min); = 4.72
 plot(spec_dca07, display="both")
 
 spec_dca08<- decorana(spec_fin08)   # many samples deleted before
-spec_dca08 #DCA1 length = 4.84
+spec_dca08 #DCA1 length = 4.84 (mean); = 4.84 (min); = 4.85 (5%)
 plot(spec_dca08, display="both")
 
 spec_dca09<- decorana(spec_fin09)   # many samples deleted before
-spec_dca09 #DCA1 length = 2.39
+spec_dca09 #DCA1 length = 2.39 (mean); = 2.4; = 2.4 (5 %)
 plot(spec_dca09, display="both")
 
 spec_dca10<- decorana(spec_fin10)
-spec_dca10 #DCA1 length = 4.31
+spec_dca10 #DCA1 length = 4.31 (mean); 4.29 (min); = 4.34 (5%)
 plot(spec_dca10, display="both")
 
 spec_dca11<- decorana(spec_fin11)
-spec_dca11 #DCA1 length = 6.13
+spec_dca11 #DCA1 length = 6.13 (mean); = 6.07 (min); = 6.09 (5%)
 plot(spec_dca11, display="both")
 
 # Conducting unimodal analysis would be okay for all years except for 2009.
+# No big difference between taken the mean or the minimum of the cover values.
 ```
 
 ## Visualize the sampling frequency
@@ -519,9 +493,11 @@ for(i in 1:2) #should produce two figures next to each other
 barplot(event_counts[ ,2], names.arg = event_counts[ ,1], xlab="Year", ylab="Number of sampling events", main="Event counts per year")
 
 # Delete rows where cover was not measured but instead abundance
-join_cov <- select(join, sample_id, year, month, cover)
+join_cov <- select(join, taxon, sample_id, site_id, year, month, cover)
 join_cov <- join_cov[complete.cases(join_cov), ]
 # 39583 of 45980 entries remain
+join_cov <- join_cov[!join_cov$cover=="0", ]
+# 39270 entries remain
 
 event_counts_cov <- join_cov %>%
   group_by(year) %>%
@@ -531,6 +507,7 @@ event_counts_cov <- join_cov %>%
 barplot(event_counts_cov[ ,2], names.arg = event_counts_cov[ ,1], xlab="Year", ylab="Number of sampling events", main="Event counts per year - Cover")
 
 ```
+
 Samples per year
 ```{r  sampling-frequency, echo=TRUE, message=FALSE}
 # count number of samples per year
@@ -763,6 +740,31 @@ sample_counts_2012 <- select(join_cov, sample_id, year, month) %>%
 barplot(sample_counts_2012[ ,2], names.arg = sample_counts_2012[ ,1], xlab="Year", ylab="Number of samples", main="Samples per month of 2012")
 ```
 
+```{r  blank, echo=TRUE, message=FALSE}
+# calculate minimale Deckung pro Monat und site (und Taxon) berechnen over all years together.
+cast05<- data.table::dcast(dia05, site_id ~ taxon, fill=0, fun=min)
+
+
+dia <- select(join, taxon, site_id, date, month, cover)
+dia$cover <- as.numeric(dia$cover)
+dia <- dia[complete.cases(dia), ]
+
+require(data.table)
+cast <- data.table::dcast(join, site_id ~ taxon, fill = 0, fun.aggregate=min, value.var = "cover")
+# species that occur at less than 2 sites not removed.
+
+dia <- select(join_cov, taxon, site_id, month, cover) %>%
+  group_by(month, site_id, taxon) %>%
+  summarise_each(funs(min_cover = min(cover), mean_cover = mean(cover), quantile(cover, 0.05), count = n())) %>%
+  as.data.frame()
+# dia has 34162 entries
+
+
+
+```
+
+              
+```
 
 Conduct CA
 ```{r  ca, echo=TRUE, message=FALSE}
