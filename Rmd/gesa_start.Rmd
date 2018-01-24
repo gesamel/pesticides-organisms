@@ -3,8 +3,8 @@ title: "Untitled"
 author: "Gesa Amelung"
 date: "7 November 2017"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 
 ## Setup
@@ -95,7 +95,7 @@ dbUnloadDriver(drv)
 ## Compare both sample datasets
 # Want to compare tables on year and site_id:
 Extract year from date.
-```{r  extract-year-from-date echo=TRUE, message=FALSE}
+```{r  extract-year-from-date, echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
 
@@ -107,7 +107,7 @@ sam_tab = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date,
                      ON dsam.site_id = psam.site_id
                     LIMIT 100");
 
-
+# Not really helpful yet, I keep it anyways, just in case.
 dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
@@ -160,56 +160,65 @@ join$month <- as.numeric(format(join$date, '%m'))
 # Shorten taxon name
 join$taxon <- sub("^(\\S*\\s+\\S+).*", "\\1", join$taxon)
 
-join$cover <- round(join$cover, digits = 4)
+# Delete species where cover =0
+join <- join[!join$cover=="0", ]
+
+# join$cover <- round(join$cover, digits = 4)
 
 
 dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
 
-```{r  join-2005, echo=TRUE, message=FALSE}
-drv = dbDriver("PostgreSQL")
-con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+## Taxon frequency
+Are there any rare species? Marchant (2002) suggests to remove rare species and Cao et al.(2001) suggests this if samples were taken over a large spatial scale which holds true for the present data. So the question is what a suitable definition for rare species is. E.g. species that occur in only 1 sample. Different approaches were performed in the literature.
 
-# Since iz_n (species abundance) is often empty,  I instead choose cover for abundance data.
+```{r  taxon-frequency, echo=TRUE, message=FALSE}
+taxon_count <- table(join$taxon)
+summary(taxon_count)
+taxon_count <-as.data.frame(taxon_count)
+taxon_count <- taxon_count[order(taxon_count$Freq),]
+head(taxon_count)
+freqn <- nrow(taxon_count) # 730
+freqn
+freq3 <- nrow(taxon_count[taxon_count$Freq<5,]) # 297 taxa only present less than 5 times.
+freq3
+freq2 <- nrow(taxon_count[taxon_count$Freq<3,]) # 207 taxa only present less than 3 times.
+freq2
+freq1 <- nrow(taxon_count[taxon_count$Freq<2,]) # 120 taxa only present once.
+freq1
 
-# join2005b = dbGetQuery(con, " SELECT DISTINCT ON (dsam.site_id, dsam.taxon, dsam.date) dsam.site_id, dsam.date, taxon, dsam.iz_n, cover, psam.date, var.psm_type, var.name
-                   FROM dia.dia_samples AS dsam
-                   INNER JOIN views.psm_samples_2005 AS psam
-                   ON dsam.site_id = psam.site_id
-                   INNER JOIN phch.phch_variables var 
-                   ON var.variable_id = psam.variable_id 
-                  WHERE var.psm_type = 'herbicide'
-                   AND (dsam.date BETWEEN '2005-01-01' AND '2005-12-31'
-                   AND psam.date BETWEEN '2005-01-01' AND '2005-12-31')
-                  ORDER BY dsam.date, dsam.site_id, dsam.taxon
-                   ")
+hist(taxon_count$Freq, breaks = 50)   
 
-dbDisconnect(con)
-dbUnloadDriver(drv)
+# relative frequency of species that are only present once.
+freq1/freqn*100       # 16.4 % of all species are only present once.
+freq1/nrow(join)*100 # 0.26 % of all Samples-site combinations represent a species that was sampled only once.
 ```
-## Shorten taxon name
-```{r  shorten-taxon-name, echo=TRUE, message=FALSE}
-taxa_list <-unique(join$taxon)
-taxa_cha <- as.character(taxa_list)
-species_list <- sort(taxa_cha) #list of all species
-species_list
-nrow(as.data.frame(species_list)) # 931 different taxa in the dataset
+The distribution of species frequency is very left-skewed. Most species are present in less than ~200 samples and few are present in more than 200 samples.
 
-taxa_genus <- sapply(strsplit(taxa_cha, ' '), '[', 1) # keeps only genus name
-taxa_species <- sapply(strsplit(taxa_cha, ' '), '[', 2) # keeps only species name
-genus_list<- sort(unique(taxa_temp))    #list of all genera
-genus_list
-nrow(as.data.frame(genus_list))
+## Get at list of taxa.
+```{r  taxon-list, echo=TRUE, message=FALSE}
+taxa_list <-sort(unique(join$taxon)) # list of al species in the dataset
+nrow(as.data.frame(taxa_list)) #800 different species are in the dataset
 
-# Keep only Genus + species name.
-# join$taxon <- sub("^(\\S*\\s+\\S+).*", "\\1", join$taxon)
-# Only 800 differet species left after shortening of the name.
+genus_list <- sapply(strsplit(as.character(taxa_list), ' '), '[', 1) # keeps only genus name
+genus_list <-sort(unique(genus_list)) # list of all genera in the dataset
+nrow(as.data.frame(genus_list)) # 70 different genera are in the dataset
+```
+
+Delete rows where abundance was measured instead of cover
+```{r  subset-data-years, echo=TRUE, message=FALSE}
+
+join_cov <- select(join, taxon, sample_id, site_id, year, month, cover)
+join_cov <- join_cov[complete.cases(join_cov), ]
+# 39583 of 45980 entries remain
+join_cov <- join_cov[!join_cov$cover=="0", ]
+# 39270 entries remain
 ```
 
 # Subset data for specific years
 ```{r  subset-data-years, echo=TRUE, message=FALSE}
-# within R and not via SQL query
+# within R and not via SQL query (quicker if join is already in envrironment)
 join2005 <- subset(join, date < as.Date("2006-01-01"))
 join2006 <- subset(join, (date < as.Date("2007-01-01"))&(date > as.Date("2005-12-31")))
 join2007 <- subset(join, (date < as.Date("2008-01-01"))&(date > as.Date("2006-12-31")))
@@ -224,8 +233,10 @@ join2015 <- subset(join, date > as.Date("2014-12-31"))
 
 ```
 
-# Transform data with reshape2 package to get from long to wide data for the site_id.
-```{r  transform-data-to-wide, echo=TRUE, message=FALSE}
+# Transform data to get from long to wide data
+Prepare data for transformation.
+```{r  prepare-data-for-transformation, echo=TRUE, message=FALSE}
+# Since iz_n (species abundance) is often empty,  I instead choose cover for abundance data.
 
 # Create proper data format
 dia05 <- data.frame(join2005$taxon, join2005$site_id, join2005$date, join2005$year, join2005$month, as.numeric(join2005$cover))
@@ -235,18 +246,12 @@ dia08 <- data.frame(join2008$taxon, join2008$site_id, join2008$date, join2008$ye
 dia09 <- data.frame(join2009$taxon, join2009$site_id, join2009$date, join2009$year, join2009$month, as.numeric(join2009$cover))
 dia10 <- data.frame(join2010$taxon, join2010$site_id, join2010$date, join2010$year, join2010$month, as.numeric(join2010$cover))
 dia11 <- data.frame(join2011$taxon, join2011$site_id, join2011$date, join2011$year, join2011$month, as.numeric(join2011$cover))
-dia12 <- data.frame(join2012$taxon, join2013$site_id, join2013$date, join2012$year, join2012$month, as.numeric(join2013$cover))
+dia12 <- data.frame(join2012$taxon, join2012$site_id, join2012$date, join2012$year, join2012$month, as.numeric(join2012$cover))
 dia13 <- data.frame(join2013$taxon, join2013$site_id, join2013$date, join2013$year, join2013$month, as.numeric(join2013$cover))
 dia14 <- data.frame(join2014$taxon, join2014$site_id, join2014$date, join2014$year, join2014$month, as.numeric(join2014$cover))
 dia15 <- data.frame(join2015$taxon, join2015$site_id, join2015$date, join2015$year, join2015$month, as.numeric(join2015$cover))
-
-# Delete rows with missing values
-dia05 <- dia05[complete.cases(dia05), ]
-dia08 <- dia08[complete.cases(dia08), ]
-dia09 <- dia09[complete.cases(dia09), ]
-dia12 <- dia12[complete.cases(dia12), ]
-# if conducted for 2012, no samples are left.
-
+# In 2013, there is only one observation. For 2014 and 2015, there are no observations at all.
+# I will ignore them from now on.
 
 # Rename the columns
 names(dia05) <- c("taxon", "site_id", "date", "year", "month", "cover" )
@@ -257,9 +262,37 @@ names(dia09) <- c("taxon", "site_id", "date", "year", "month", "cover" )
 names(dia10) <- c("taxon", "site_id", "date", "year", "month", "cover" )
 names(dia11) <- c("taxon", "site_id", "date", "year", "month", "cover" )
 names(dia12) <- c("taxon", "site_id", "date", "year", "month", "cover" )
-names(dia13) <- c("taxon", "site_id", "date", "year", "month", "cover" )
-names(dia14) <- c("taxon", "site_id", "date", "year", "month", "cover" )
-names(dia15) <- c("taxon", "site_id", "date", "year", "month", "cover" )
+
+
+# How many NAs are (in the the column cover) each year?
+sum(is.na(dia05$cover)) #1   # from 1704
+sum(is.na(dia06$cover)) #0   
+sum(is.na(dia07$cover)) #0
+sum(is.na(dia08$cover)) #246 # from 4949
+sum(is.na(dia09$cover)) #981 # from 10581
+sum(is.na(dia10$cover)) #0   
+sum(is.na(dia11$cover)) #0
+sum(is.na(dia12$cover)) #5165 # from 8055
+
+# Delete rows with missing values
+dia05 <- dia05[complete.cases(dia05), ]
+dia08 <- dia08[complete.cases(dia08), ]
+dia09 <- dia09[complete.cases(dia09), ]
+dia12 <- dia12[complete.cases(dia12), ]
+
+# Delete rows where cover =0
+dia05 <- dia05[!dia05$cover=="0", ]
+dia06 <- dia06[!dia06$cover=="0", ]
+dia07 <- dia07[!dia07$cover=="0", ]
+dia08 <- dia08[!dia08$cover=="0", ]
+dia09 <- dia09[!dia09$cover=="0", ]
+dia10 <- dia10[!dia10$cover=="0", ]
+dia11 <- dia11[!dia11$cover=="0", ]
+dia12 <- dia12[!dia12$cover=="0", ]
+```
+
+Transform data from long to wide format. Take the mean for aggregation if several combinations of site_id and species are present.
+```{r  transformation-mean, echo=TRUE, message=FALSE}
 
 # Aggregate with reshape2
 # require(reshape2)
@@ -277,20 +310,25 @@ names(dia15) <- c("taxon", "site_id", "date", "year", "month", "cover" )
 # (That meet the criteria that herbicides were sampled in the same year at the same site.)
 
 # Aggregate with data.table
+# If combination appears several times, an aggregation function has to be chosen to combine them into one number.
+# Choose either mean, min or calculate the 5th percentile.
 require(data.table)
-#cast05<- data.table::dcast(dia05, site_id ~ taxon, fill=0, fun=mean)
-#cast06<- data.table::dcast(dia06, site_id ~ taxon, fill=0, fun=mean)
-#cast07<- data.table::dcast(dia07, site_id ~ taxon, fill=0, fun=mean)
-#cast08<- data.table::dcast(dia08, site_id ~ taxon, fill=0, fun=mean)
-#cast09<- data.table::dcast(dia09, site_id ~ taxon, fill=0, fun=mean)
-#cast10<- data.table::dcast(dia10, site_id ~ taxon, fill=0, fun=mean)
-#cast11<- data.table::dcast(dia11, site_id ~ taxon, fill=0, fun=mean)
 
-# cast12<- data.table::dcast(dia12, site_id ~ taxon, fill=0, fun=mean)
-# cast13<- data.table::dcast(dia13, site_id ~ taxon, fill=0, fun=mean)
-# cast14<- data.table::dcast(dia14, site_id ~ taxon, fill=0, fun=mean)
-# cast15<- data.table::dcast(dia15, site_id ~ taxon, fill=0, fun=mean)
+# Take the mean for aggregation
+cast05<- data.table::dcast(dia05, site_id ~ taxon, fill=0, fun=mean)
+cast06<- data.table::dcast(dia06, site_id ~ taxon, fill=0, fun=mean)
+cast07<- data.table::dcast(dia07, site_id ~ taxon, fill=0, fun=mean)
+cast08<- data.table::dcast(dia08, site_id ~ taxon, fill=0, fun=mean)
+cast09<- data.table::dcast(dia09, site_id ~ taxon, fill=0, fun=mean)
+cast10<- data.table::dcast(dia10, site_id ~ taxon, fill=0, fun=mean)
+cast11<- data.table::dcast(dia11, site_id ~ taxon, fill=0, fun=mean)
+cast12<- data.table::dcast(dia12, site_id ~ taxon, fill=0, fun=mean)
 
+```
+
+Take the minimum value for aggregation.
+```{r  transformation-min, echo=TRUE, message=FALSE}
+# Take the minimum value for aggregation
 cast05<- data.table::dcast(dia05, site_id ~ taxon, fill=0, fun=min)
 cast06<- data.table::dcast(dia06, site_id ~ taxon, fill=0, fun=min)
 cast07<- data.table::dcast(dia07, site_id ~ taxon, fill=0, fun=min)
@@ -298,8 +336,13 @@ cast08<- data.table::dcast(dia08, site_id ~ taxon, fill=0, fun=min)
 cast09<- data.table::dcast(dia09, site_id ~ taxon, fill=0, fun=min)
 cast10<- data.table::dcast(dia10, site_id ~ taxon, fill=0, fun=min)
 cast11<- data.table::dcast(dia11, site_id ~ taxon, fill=0, fun=min)
+cast12<- data.table::dcast(dia12, site_id ~ taxon, fill=0, fun=min)
+```
 
+Take the 5th percentile for aggregation.
+```{r  transformation-5th, echo=TRUE, message=FALSE}
 # Calculating the 5th percentile of each cover entry
+require(dplyr)
 
 cov5th_05 <- select(join_cov, year, taxon,site_id, cover) %>%
   filter(year==2005) %>%
@@ -348,7 +391,7 @@ cov5th_12 <- select(join_cov, year, taxon,site_id, cover) %>%
   group_by(site_id, taxon) %>%
   summarise('5 %' = quantile(cover, probs=0.05))  %>%
   as.data.frame()
-# wieso sind auf einmal so viele Werte für 2015 da? Eigentlich sollten die cover = na werte rausgelöscht sein.
+
 
 cast05 <-data.table::dcast(cov5th_05, site_id ~ taxon, fill =0)
 cast06 <-data.table::dcast(cov5th_06, site_id ~ taxon, fill =0)
@@ -359,7 +402,11 @@ cast10 <-data.table::dcast(cov5th_10, site_id ~ taxon, fill =0)
 cast11 <-data.table::dcast(cov5th_11, site_id ~ taxon, fill =0)
 cast12 <-data.table::dcast(cov5th_12, site_id ~ taxon, fill =0)
 
-
+```
+ 
+ Remove the site information. Do this for all three aggregation methods.
+```{r  remove-site-information, echo=TRUE, message=FALSE}
+# Do this for all three methods:
 # removal of site information
 cast05 <-cast05[, -1] 
 cast06 <-cast06[, -1]
@@ -369,36 +416,21 @@ cast09 <-cast09[, -1]
 cast10 <-cast10[, -1]
 cast11 <-cast11[, -1] 
 cast12 <-cast12[, -1]
-# cast13 <-cast13[, -1] 
-# cast14 <-cast14[, -1]
-# cast15 <-cast15[, -1] 
-
 ```
 
-
+Removal of rare species.
 ```{r  remove-rare-species, echo=TRUE, message=FALSE}
 # presence-absence transformation to calculate species number per site
 require(vegan)
 cast05_pa <-decostand(cast05, "pa") 
-cast06_pa <-decostand(cast06, "pa") #works
-cast07_pa <-decostand(cast07, "pa") #works
+cast06_pa <-decostand(cast06, "pa")
+cast07_pa <-decostand(cast07, "pa")
 cast08_pa <-decostand(cast08, "pa")
 cast09_pa <-decostand(cast09, "pa")
-cast10_pa <-decostand(cast10, "pa") #works
-cast11_pa <-decostand(cast11, "pa") #works
+cast10_pa <-decostand(cast10, "pa")
+cast11_pa <-decostand(cast11, "pa")
 cast12_pa <-decostand(cast12, "pa")
-# NAs in some cells. There, probably, not cover was measured but abundance/iz_n
 
-# How many times does this happen?
-sum(is.na(dia05$cover)) #1   # from 1704
-sum(is.na(dia06$cover)) #0   
-sum(is.na(dia07$cover)) #0
-sum(is.na(dia08$cover)) #246 # from 4949
-sum(is.na(dia09$cover)) #981 # from 10581
-sum(is.na(dia10$cover)) #0   
-sum(is.na(dia11$cover)) #0
-sum(is.na(dia12$cover)) #8055 # from 8055
-# try with again with removing all rows that have NAs. (done above)
 
 # calculate sum per species
 spec_sum05 <- apply(cast05_pa,2,sum)
@@ -413,6 +445,7 @@ spec_sum10 <- apply(cast10_pa,2,sum)
 # sort(spec_sum10)
 spec_sum11 <- apply(cast11_pa,2,sum)
 # sort(spec_sum11)
+spec_sum12 <- apply(cast12_pa,2,sum)
 
 
 # remove species that occur at less than 2 sites
@@ -429,11 +462,12 @@ spec_fin10 <- cast10[, ! spec_sum10 <2]
 # sort(apply(spec_fin10, 2, max))
 spec_fin11 <- cast11[, ! spec_sum11 <2]
 # sort(apply(spec_fin11, 2, max))
-# spec_fin12 <- cast12[, ! spec_sum12 <2]
+spec_fin12 <- cast12[, ! spec_sum12 <2]
 
 ```
 
-Conduct DCA to see if axis length indicates unimodal gradient.
+# DCA
+Conduct DCA to see if axis length indicates unimodal response..
 ```{r  dca, echo=TRUE, message=FALSE}
 require(vegan)
 # axis lenght = SD. For axis length < 3, linear analysis should be used, for axis length >3, unimodal analysis should be performed.
@@ -442,7 +476,7 @@ require(vegan)
 
 # Don't use decorana-values.
 spec_dca05<- decorana(spec_fin05)
-spec_dca05 #DCA1 length = 3.66 (mean);  = 3.63 (min); = 3.2 (5%)
+spec_dca05 #DCA1 length = 3.65 (mean);  = 3.62 (min); = 3.2 (5%)
 # summary(spec_dca05, digits=3, origin=TRUE, display="both")
 
 plot(spec_dca05, display="both") 
@@ -450,35 +484,39 @@ plot(spec_dca05, display="both")
 # shnam <- make.cepnames(names(spec_fin)) #abbreaviation of Latin names
 
 spec_dca06<- decorana(spec_fin06)
-spec_dca06 #DCA1 length = 7.48 (mean); = 7.56 (min); = 7.57 (5%)
+spec_dca06 #DCA1 length = 7.48 (mean); = 7.57 (min); = 7.57 (5%)
 plot(spec_dca06, display="both")
 
 spec_dca07<- decorana(spec_fin07)
-spec_dca07 #DCA1 length = 4.83 (mean); =4.69 (min); = 4.72
+spec_dca07 #DCA1 length = 4.83 (mean); =4.72 (min); = 4.72
 plot(spec_dca07, display="both")
 
 spec_dca08<- decorana(spec_fin08)   # many samples deleted before
-spec_dca08 #DCA1 length = 4.84 (mean); = 4.84 (min); = 4.85 (5%)
+spec_dca08 #DCA1 length = 4.85 (mean); = 4.85 (min); = 4.85 (5%)
 plot(spec_dca08, display="both")
 
 spec_dca09<- decorana(spec_fin09)   # many samples deleted before
-spec_dca09 #DCA1 length = 2.39 (mean); = 2.4; = 2.4 (5 %)
+spec_dca09 #DCA1 length = 2.39 (mean); = 2.39; = 2.4 (5 %)
 plot(spec_dca09, display="both")
 
 spec_dca10<- decorana(spec_fin10)
-spec_dca10 #DCA1 length = 4.31 (mean); 4.29 (min); = 4.34 (5%)
+spec_dca10 #DCA1 length = 4.33 (mean); 4.34 (min); = 4.34 (5%)
 plot(spec_dca10, display="both")
 
 spec_dca11<- decorana(spec_fin11)
-spec_dca11 #DCA1 length = 6.13 (mean); = 6.07 (min); = 6.09 (5%)
+spec_dca11 #DCA1 length = 6.19 (mean); = 6.09 (min); = 6.09 (5%)
+plot(spec_dca11, display="both")
+
+spec_dca12<- decorana(spec_fin12)
+spec_dca12 #DCA1 length = 3.77 (mean); = 3.7 (min); = (5%) = 3.70
 plot(spec_dca11, display="both")
 
 # Conducting unimodal analysis would be okay for all years except for 2009.
 # No big difference between taken the mean or the minimum of the cover values.
 ```
 
-## Visualize the sampling frequency
-Sampling day per year
+## Visualization of the sampling frequency
+Sampling days/sampling events per year
 ```{r sampling-days-per-year, echo=TRUE, message=FALSE}
 # sample_id
 # count number of sampling_id per year
@@ -532,6 +570,7 @@ barplot(sample_counts_cov[ ,2], names.arg = sample_counts_cov[ ,1], xlab="Year",
 
 ```
 
+Sampling frequency 2005
 ```{r  sampling-frequency-2005, echo=TRUE, message=FALSE}
 require(dplyr)
 # Only rows considered with cover column filled out
@@ -558,6 +597,7 @@ sample_counts_2005 <- select(join_cov, sample_id, year, month) %>%
 barplot(sample_counts_2005[ ,2], names.arg = sample_counts_2005[ ,1], xlab="Year", ylab="Number of samples", main="Samples per month of 2005")
 ```
 
+Sampling frequency 2006
 ```{r  sampling-frequency-2006, echo=TRUE, message=FALSE}
 require(dplyr)
 # Only rows considered with cover column filled out
@@ -583,7 +623,7 @@ sample_counts_2006 <- select(join_cov, sample_id, year, month) %>%
   
 barplot(sample_counts_2006[ ,2], names.arg = sample_counts_2006[ ,1], xlab="Year", ylab="Number of samples", main="Samples per month of 2006")
 ```
-
+Sampling frequency 2007
 ```{r  sampling-frequency-2007, echo=TRUE, message=FALSE}
 require(dplyr)
 # Only rows considered with cover column filled out
@@ -610,6 +650,7 @@ sample_counts_2007 <- select(join_cov, sample_id, year, month) %>%
 barplot(sample_counts_2007[ ,2], names.arg = sample_counts_2007[ ,1], xlab="Year", ylab="Number of samples", main="Samples per month of 2007")
 ```
 
+Sampling frequency 2008
 ```{r  sampling-frequency-2008, echo=TRUE, message=FALSE}
 require(dplyr)
 # Only rows considered with cover column filled out
@@ -636,6 +677,7 @@ sample_counts_2008 <- select(join_cov, sample_id, year, month) %>%
 barplot(sample_counts_2008[ ,2], names.arg = sample_counts_2008[ ,1], xlab="Year", ylab="Number of samples", main="Samples per month of 2008")
 ```
 
+Sampling frequency 2009
 ```{r  sampling-frequency-2009, echo=TRUE, message=FALSE}
 require(dplyr)
 # Only rows considered with cover column filled out
@@ -662,6 +704,7 @@ sample_counts_2009 <- select(join_cov, sample_id, year, month) %>%
 barplot(sample_counts_2009[ ,2], names.arg = sample_counts_2009[ ,1], xlab="Year", ylab="Number of samples", main="Samples per month of 2009")
 ```
 
+Sampling frequency 2010
 ```{r  sampling-frequency-2010, echo=TRUE, message=FALSE}
 require(dplyr)
 # Only rows considered with cover column filled out
@@ -688,6 +731,7 @@ sample_counts_2010 <- select(join_cov, sample_id, year, month) %>%
 barplot(sample_counts_2010[ ,2], names.arg = sample_counts_2010[ ,1], xlab="Year", ylab="Number of samples", main="Samples per month of 2010")
 ```
 
+Sampling frequency 2011
 ```{r  sampling-frequency-2011, echo=TRUE, message=FALSE}
 require(dplyr)
 # Only rows considered with cover column filled out
@@ -714,6 +758,7 @@ sample_counts_2011 <- select(join_cov, sample_id, year, month) %>%
 barplot(sample_counts_2011[ ,2], names.arg = sample_counts_2011[ ,1], xlab="Year", ylab="Number of samples", main="Samples per month of 2011")
 ```
 
+Sampling frequency 2012
 ```{r  sampling-frequency-2012, echo=TRUE, message=FALSE}
 require(dplyr)
 # Only rows considered with cover column filled out
@@ -740,8 +785,8 @@ sample_counts_2012 <- select(join_cov, sample_id, year, month) %>%
 barplot(sample_counts_2012[ ,2], names.arg = sample_counts_2012[ ,1], xlab="Year", ylab="Number of samples", main="Samples per month of 2012")
 ```
 
+Calculation of the minimal cover per month and site and taxon over all years together.
 ```{r  blank, echo=TRUE, message=FALSE}
-# calculate minimale Deckung pro Monat und site (und Taxon) berechnen over all years together.
 cast05<- data.table::dcast(dia05, site_id ~ taxon, fill=0, fun=min)
 
 
@@ -759,12 +804,9 @@ dia <- select(join_cov, taxon, site_id, month, cover) %>%
   as.data.frame()
 # dia has 34162 entries
 
-
-
 ```
 
-              
-```
+            
 
 Conduct CA
 ```{r  ca, echo=TRUE, message=FALSE}
@@ -778,7 +820,7 @@ chisq.test(spec_fin/sum(spec_sum))
 plot(spec_ca, scaling =1) #site scores as weighted averages of species scores
 
 # CA for all years seperately
-spec_ca06 <- cca(spec_fin05)
+spec_ca05 <- cca(spec_fin05)
 plot(spec_ca05)
 spec_ca06 <- cca(spec_fin06)
 plot(spec_ca06)
@@ -792,11 +834,14 @@ spec_ca10 <- cca(spec_fin10)
 plot(spec_ca10)
 spec_ca11 <- cca(spec_fin11)
 plot(spec_ca11)
+spec_ca12 <- cca(spec_fin12)
+plot(spec_ca12)
 # Arch effect not so visible, mostl< only on one side. Outliers make interpretation hard.
-
+# Output could change depending on the aggregation method.
 ```
 
 # Creating a data frame
+Code not needed at the moment, I keep it just in case.
 ```{r  create-data-frame, echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
@@ -841,54 +886,9 @@ dbUnloadDriver(drv)
 ```
 
 
-
-## Taxon frequency
-Are there any rare species? Marchant (2002) suggests to remove rare species and Cao et al.(2001) suggests this if samples were taken over a large spatial scale which holds true for the present data. So the question is what a suitable definition for rare species is. E.g. species that occur in only 1 sample.
-
-```{r  taxon-frequency, echo=TRUE, message=FALSE}
-
-# taxon_count <- table(dia_sam$dv)
-taxon_count <- table(join$taxon)
-# taxon_count <- table(dia_sam$taxon)
-summary(taxon_count)
-taxon_count <-as.data.frame(taxon_count)
-taxon_count <- taxon_count[order(taxon_count$Freq),]
-head(taxon_count)
-freqn <- nrow(taxon_count) # 931   #800 after name shortening
-freq3 <- nrow(taxon_count[taxon_count$Freq<5,]) # 383   # 327 after name shortening
-freq2 <- nrow(taxon_count[taxon_count$Freq<3,]) # 274   # 229 after name shortening
-freq1 <- nrow(taxon_count[taxon_count$Freq<2,]) # 172   # 141 after name shortening
-hist(taxon_count$Freq, breaks = 50)   
-
-# relative frequency of species that are only present at 1 site
-freq1/freqn*100       # 17.6 % of all species are only present at 1 site
-freq1/nrow(join)*100 # 0.3 % of all Samples-site combinations represent a species that was sampled only once.
-
-
-# Sollte ich seltene Arten weglassen? Wenn ja, welche Arten stufe ich als selten ein?
-```
-The distribution of species frequency is very left-skewed. Most speces are present in less than ~200 samples and few are present in more than 200 samples.
-
 ```{r  read-taxalisten-data, echo=TRUE, message=FALSE}
 samples_taxon <- merge(dia_sam_year, diatom_dat, by.x="dv", by.y="DV")
 diatom_dat1<- read.table("C_Proben_Taxalisten.txt",header=T,sep="\t",dec=".")
-
-```
-
-```{r  suggestions-andreas, echo=TRUE, message=FALSE}
-require(data.table)    # good for subsampling --> datacamp course
-iris_dt <- as.data.table(iris)
-class(iris_dt)
-head(iris_dt)
-iris_dt[i = 1:100, j = mean(Sepal.Length), by = Species]
-diatom_dat1 <- fread("C_Proben_Taxalisten.txt") # schnellere funktion als read.csv usq. auch: fwrite()
-
-
-require(dplyr)     # good for subsampling
-
-iris$Sepal.Length
-# with base package:
-aggregate(iris$Sepal.Length, by = list(iris$Species), mean)
 
 ```
 
