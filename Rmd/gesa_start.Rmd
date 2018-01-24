@@ -787,22 +787,12 @@ barplot(sample_counts_2012[ ,2], names.arg = sample_counts_2012[ ,1], xlab="Year
 
 Calculation of the minimal cover per month and site and taxon over all years together.
 ```{r  blank, echo=TRUE, message=FALSE}
-cast05<- data.table::dcast(dia05, site_id ~ taxon, fill=0, fun=min)
-
-
-dia <- select(join, taxon, site_id, date, month, cover)
-dia$cover <- as.numeric(dia$cover)
-dia <- dia[complete.cases(dia), ]
-
-require(data.table)
-cast <- data.table::dcast(join, site_id ~ taxon, fill = 0, fun.aggregate=min, value.var = "cover")
-# species that occur at less than 2 sites not removed.
-
 dia <- select(join_cov, taxon, site_id, month, cover) %>%
   group_by(month, site_id, taxon) %>%
   summarise_each(funs(min_cover = min(cover), mean_cover = mean(cover), quantile(cover, 0.05), count = n())) %>%
   as.data.frame()
 # dia has 34162 entries
+# However, casting data from long to wide format would still not work since there are stillseveral combinations for site and species.
 
 ```
 
