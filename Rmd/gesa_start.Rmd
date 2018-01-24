@@ -93,7 +93,7 @@ dbUnloadDriver(drv)
 
 
 ## Compare both sample datasets
-# Want to compare tables on year and site_id:
+Want to compare tables on year and site_id:
 Extract year from date.
 ```{r  extract-year-from-date, echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
@@ -196,7 +196,7 @@ freq1/nrow(join)*100 # 0.26 % of all Samples-site combinations represent a speci
 ```
 The distribution of species frequency is very left-skewed. Most species are present in less than ~200 samples and few are present in more than 200 samples.
 
-## Get at list of taxa.
+## Get at list of taxa
 ```{r  taxon-list, echo=TRUE, message=FALSE}
 taxa_list <-sort(unique(join$taxon)) # list of al species in the dataset
 nrow(as.data.frame(taxa_list)) #800 different species are in the dataset
@@ -806,9 +806,7 @@ dia <- select(join_cov, taxon, site_id, month, cover) %>%
 
 ```
 
-            
-
-Conduct CA
+## CA
 ```{r  ca, echo=TRUE, message=FALSE}
 require(vegan)
 # conduct CA
@@ -840,7 +838,7 @@ plot(spec_ca12)
 # Output could change depending on the aggregation method.
 ```
 
-# Creating a data frame
+Creating a data frame
 Code not needed at the moment, I keep it just in case.
 ```{r  create-data-frame, echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
