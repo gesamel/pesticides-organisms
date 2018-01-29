@@ -5,6 +5,8 @@ date: "7 November 2017"
 output:
   pdf_document: default
   html_document: default
+editor_options: 
+  chunk_output_type: console
 ---
 
 ## Setup
@@ -16,10 +18,15 @@ Load the following packages and load the data base access scipt:
 require(RPostgreSQL)
 require(sf)
 require(knitr)
+#AS: added some used packages to the top:
+require(mapview)
+require(data.table)
+require(dplyr)
 
 ## load access data
-path = 'D:/Gesa/Dokumente/Ecotoxicology/RPC'
-source(file.path(path, 'amelung_access.R'))
+path = getwd() #AS: necessary to make it run for me
+#path = 'D:/Gesa/Dokumente/Ecotoxicology/RPC'
+source(file.path(path, 'Rmd', 'R', 'amelung_access.R'))
 
 ```
 
@@ -41,14 +48,14 @@ psm_samples2 = dbGetQuery(con, "SELECT *
                               ON var.variable_id = sam.variable_id
                          WHERE var.psm_type = 'herbicide'
                          ORDER BY sam.sample_id
-                         LIMIT 1000")
+                         LIMIT 1000") #AS: hier ist noch ein Limit von 1000. Warum?
 
 
 psm = dbGetQuery(con, "SELECT *
                                FROM views.psm_samples_2005 sam
                                
                          ORDER BY sam.sample_id
-                         LIMIT 1000")
+                         LIMIT 1000") #AS: hier ist noch ein Limit von 1000. Warum?
 
 dbDisconnect(con)
 dbUnloadDriver(drv)
@@ -58,17 +65,13 @@ dbUnloadDriver(drv)
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
 
-require(RPostgreSQL)
-require(sf)
-require(mapview)
-
 dia_sites = dbGetQuery(con, "SELECT * FROM dia.dia_sites")
 dia_sites_geo = st_read_db(con, query = "SELECT * FROM dia.dia_sites LIMIT 10")
 dia_sam = dbGetQuery(con, "SELECT *
                        FROM dia.dia_samples
                        WHERE date > '2004-12-31'
                        ")
-mapview(dia_sites_geo)
+# mapview(dia_sites_geo)
 
 dbDisconnect(con)
 dbUnloadDriver(drv)
@@ -82,11 +85,10 @@ con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBpor
 # there are more sites than psm_sites (including only pesticides) though they aren't necessary for us.
 phch_samples = dbGetQuery(con, "SELECT *
                                 FROM phch.phch_samples sam
-                                JOIN phch.phch_variables var ON var.variable_id = sam.variable_id
+                                LEFT JOIN phch.phch_variables var ON var.variable_id = sam.variable_id
                                 WHERE var.name IN ('Wassertemperatur', 'Sulfat');")
-
+phch_samples = phch_samples[ , -c(16, 24)] #AS! removes duplicated unit, variable_id entries
 # 596477 observations
-
 dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
@@ -110,11 +112,46 @@ sam_tab = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date,
 # Not really helpful yet, I keep it anyways, just in case.
 dbDisconnect(con)
 dbUnloadDriver(drv)
+
+##AS: Do such tasks only in R and use SQL only for loading the data. Makes it more portable
+#1) E.g with data.table:
+setDT(phch_samples)
+phch_samples[ , .(start = min(date),
+                  end = max(date)), by = site_id]
+# .() in data.table is the same as list()
+# in data.table you have always three arguments (i - select rows, j - do aggregation/filtering, by - by group)
+# in this case:
+# i is empty
+# j is in .()
+# and by is site_id
+
+#2) same with dplyr
+setDF(phch_samples)
+phch_samples %>%
+  group_by(site_id) %>%
+  summarise(start = min(date),
+            end = max(date))
 ```
 
 Select all diatom samples where environmental variable data was measured at the same site in the same year and where herbicides were detected.
 
 ```{r  join-relevant-variables, echo=TRUE, message=FALSE}
+##AS: Das ist viel zu kompliziert und langasam. mach den join in R und nicht mit SQL.
+# e.g. with data.table:
+
+setDT(dia_sam)
+setDT(phch_samples)
+# merge.data.table is used
+dia = merge(dia_sam, phch_samples, by = .EACHI, all.x = TRUE)
+# or
+dia2 = merge(phch_samples, dia_sam, all.y = TRUE)
+
+
+# oder mit dplyr (was dir lieber ist):
+dia3 = left_join(dia_sam, phch_samples)
+
+
+
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
 
@@ -174,6 +211,29 @@ dbUnloadDriver(drv)
 Are there any rare species? Marchant (2002) suggests to remove rare species and Cao et al.(2001) suggests this if samples were taken over a large spatial scale which holds true for the present data. So the question is what a suitable definition for rare species is. E.g. species that occur in only 1 sample. Different approaches were performed in the literature.
 
 ```{r  taxon-frequency, echo=TRUE, message=FALSE}
+#AS: data.table is also very nice to do different tasks successively (each within [])
+setDT(dia)
+dia200 = dia[ , .N, by = taxon][order(-N)][N >= 200] #AS : 200 is just an example
+
+#AS: dplyr approach:
+setDF(dia)
+dia200 = dia %>%
+  group_by(taxon) %>%
+  summarise(N = n()) %>%
+  arrange(-N) %>%
+  filter(N >= 200)
+
+plot(density(dia200$N))
+# taxon list
+dia200$taxon
+
+# or:
+dia %>%
+  count(taxon) %>%
+  arrange(-n) %>%
+  filter(n >= 200)
+
+
 taxon_count <- table(join$taxon)
 summary(taxon_count)
 taxon_count <-as.data.frame(taxon_count)
@@ -193,6 +253,8 @@ hist(taxon_count$Freq, breaks = 50)
 # relative frequency of species that are only present once.
 freq1/freqn*100       # 16.4 % of all species are only present once.
 freq1/nrow(join)*100 # 0.26 % of all Samples-site combinations represent a species that was sampled only once.
+
+##AS: Waht do you suggest?
 ```
 The distribution of species frequency is very left-skewed. Most species are present in less than ~200 samples and few are present in more than 200 samples.
 
@@ -219,6 +281,11 @@ join_cov <- join_cov[!join_cov$cover=="0", ]
 # Subset data for specific years
 ```{r  subset-data-years, echo=TRUE, message=FALSE}
 # within R and not via SQL query (quicker if join is already in envrironment)
+
+##AS: no need to do this. Like this you have way to many objects in your envrionment.
+# you can always subset the data.frame when needed
+phch_samples[ date <= '2007-01-01' ] #! when data.table it works without comma. Otherwiose use comma after the string
+
 join2005 <- subset(join, date < as.Date("2006-01-01"))
 join2006 <- subset(join, (date < as.Date("2007-01-01"))&(date > as.Date("2005-12-31")))
 join2007 <- subset(join, (date < as.Date("2008-01-01"))&(date > as.Date("2006-12-31")))
@@ -236,6 +303,9 @@ join2015 <- subset(join, date > as.Date("2014-12-31"))
 # Transform data to get from long to wide data
 Prepare data for transformation.
 ```{r  prepare-data-for-transformation, echo=TRUE, message=FALSE}
+##AS: not needed. See steps before. Only perform these tasks only for one object/data.frame
+
+
 # Since iz_n (species abundance) is often empty,  I instead choose cover for abundance data.
 
 # Create proper data format
@@ -294,6 +364,28 @@ dia12 <- dia12[!dia12$cover=="0", ]
 Transform data from long to wide format. Take the mean for aggregation if several combinations of site_id and species are present.
 ```{r  transformation-mean, echo=TRUE, message=FALSE}
 
+##AS: If you want to get the mean of cover for each site and taxon you can do this
+# data.table:
+# yopu can do multiple aggregations in j!!!
+setDT(dia)
+dia[ ,
+     j = .(mean = mean(cover),
+           perc5 = quantile(cover, 0.05, na.rm = TRUE),
+           min = min(cover),
+           .N), # N gives you the total number
+     by = .(taxon, site_id)][order(taxon)]
+
+# or dplyr
+setDF(dia)
+dia %>%
+  group_by(taxon, site_id) %>%
+  summarise(mean = mean(cover),
+            perc5 = quantile(cover, 0.05, na.rm = TRUE),
+            total = n()) %>%
+  arrange(taxon)
+
+
+
 # Aggregate with reshape2
 # require(reshape2)
 # cast05a <- dcast(dia05, taxon + date ~ site_id, fill = 0)
@@ -342,7 +434,28 @@ cast12<- data.table::dcast(dia12, site_id ~ taxon, fill=0, fun=min)
 Take the 5th percentile for aggregation.
 ```{r  transformation-5th, echo=TRUE, message=FALSE}
 # Calculating the 5th percentile of each cover entry
+##AS: use one object and one command for this
+# like above but with an additional year grouping variable
+
+setDT(dia)
+dia$year = format(dia$date, '%Y')
+dia[ ,year := format(date, '%Y') ] # data.table way
+dia[ ,
+     j = .(mean = mean(cover),
+           perc5 = quantile(cover, 0.05, na.rm = TRUE),
+           min = min(cover),
+           .N), # N gives you the total number
+     by = .(taxon, site_id, year)][order(site_id, taxon)]
+
+# or dplyr:
+setDF(dia)
+perc5 = function(x) quantile(x, 0.05, na.rm = TRUE)
+dia %>%
+  group_by(site_id) %>%
+  summarise_at('cover', funs(mean, min, perc5))
+
 require(dplyr)
+
 
 cov5th_05 <- select(join_cov, year, taxon,site_id, cover) %>%
   filter(year==2005) %>%
@@ -421,6 +534,9 @@ cast12 <-cast12[, -1]
 Removal of rare species.
 ```{r  remove-rare-species, echo=TRUE, message=FALSE}
 # presence-absence transformation to calculate species number per site
+
+##AS: also, as above no need for multiple objects
+
 require(vegan)
 cast05_pa <-decostand(cast05, "pa") 
 cast06_pa <-decostand(cast06, "pa")
@@ -518,20 +634,41 @@ plot(spec_dca11, display="both")
 ## Visualization of the sampling frequency
 Sampling days/sampling events per year
 ```{r sampling-days-per-year, echo=TRUE, message=FALSE}
+##AS: from here it's way too much code below:
+# You can create the same result by just a few lines:
+
+dia$month = format(dia$date, '%m')
+require(ggplot2)
+## all rows
+dia_overview = dia[ , .N, by = .(year, month)]
+
+ggplot(dia_overview, aes(y = N, x = month)) +
+  geom_point() +
+  facet_wrap( ~ year)
+
+
 # sample_id
 # count number of sampling_id per year
 require(dplyr)
 
-event_counts <- join %>%
+##AS: Mind the LIMIT when you load in the data via PostgreSQL
+event_counts <- dia %>% ##AS: changed join to dia
   group_by(year) %>%
   summarise(sampling_events_count = n_distinct(sample_id))  %>%
    as.data.frame()
 
-for(i in 1:2) #should produce two figures next to each other
-barplot(event_counts[ ,2], names.arg = event_counts[ ,1], xlab="Year", ylab="Number of sampling events", main="Event counts per year")
+for(i in 1:2) {#should produce two figures next to each other
+  barplot(event_counts[ ,2], names.arg = event_counts[ ,1], xlab="Year", ylab="Number of sampling events", main="Event counts per year")
+}
+
+##AS: or use ggplot
+ggplot(dia, aes(x = year)) +
+  geom_bar()
+
+
 
 # Delete rows where cover was not measured but instead abundance
-join_cov <- select(join, taxon, sample_id, site_id, year, month, cover)
+join_cov <- select(dia, taxon, sample_id, site_id, year, month, cover)
 join_cov <- join_cov[complete.cases(join_cov), ]
 # 39583 of 45980 entries remain
 join_cov <- join_cov[!join_cov$cover=="0", ]
@@ -552,7 +689,7 @@ Samples per year
 # The species of each site are counted seperately
 require(dplyr)
 
-sample_counts <- join %>%
+sample_counts <- dia %>%
   group_by(year) %>%
   summarise(sample_count = n()) %>%
   as.data.frame()
@@ -833,6 +970,8 @@ Code not needed at the moment, I keep it just in case.
 ```{r  create-data-frame, echo=TRUE, message=FALSE}
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+##AS: wouldn't keep such not needed code in the script. Put it somewhere else.
 
 # Functions not needed at the moment but keep them anyways, just in case.
 
