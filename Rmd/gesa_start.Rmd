@@ -42,14 +42,16 @@ con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBpor
 psm_sites = dbGetQuery(con, "SELECT *
                              FROM views.psm_sites_2005
                        ")
-psm_samples2 = dbGetQuery(con, "SELECT *
+psm_samples = dbGetQuery(con, "SELECT *
                                FROM views.psm_samples_2005 sam
                                JOIN phch.phch_variables var 
                               ON var.variable_id = sam.variable_id
-                         WHERE var.psm_type = 'herbicide'
                          ORDER BY sam.sample_id
                          LIMIT 1000") #AS: hier ist noch ein Limit von 1000. Warum?
+psm_samples = psm_samples[ ,-c(16, 24)]
 
+psm_samples = psm_samples %>%
+  filter(psm_type == 'herbicide')
 
 psm = dbGetQuery(con, "SELECT *
                                FROM views.psm_samples_2005 sam
@@ -113,6 +115,9 @@ sam_tab = dbGetQuery(con, " SELECT dsam.site_id, dsam.date, psam.date,
 dbDisconnect(con)
 dbUnloadDriver(drv)
 
+head(dia_sam)
+dia_sam$year = format(dia_sam$date, '%Y')
+
 ##AS: Do such tasks only in R and use SQL only for loading the data. Makes it more portable
 #1) E.g with data.table:
 setDT(phch_samples)
@@ -144,8 +149,10 @@ setDT(phch_samples)
 # merge.data.table is used
 dia = merge(dia_sam, phch_samples, by = .EACHI, all.x = TRUE)
 # or
-dia2 = merge(phch_samples, dia_sam, all.y = TRUE)
+dia2 = merge(phch_samples, dia_sam, all.y = TRUE, by = 'site_id')
 
+##AS: column: year + site_id als Identifikationsspalte für den merge
+head(dia_sam)
 
 # oder mit dplyr (was dir lieber ist):
 dia3 = left_join(dia_sam, phch_samples)
@@ -200,7 +207,22 @@ join$taxon <- sub("^(\\S*\\s+\\S+).*", "\\1", join$taxon)
 # Delete species where cover =0
 join <- join[!join$cover=="0", ]
 
-# join$cover <- round(join$cover, digits = 4)
+# join$cover <- round(join$cover, digits = 4)a
+dia_sam$taxon
+head(dia_sam)
+nrow(dia_sam[ dia_sam$cover == 0, ])
+nrow(dia_sam[ !is.na(dia_sam$iz_n), ])
+
+
+#AS: Art-Spalte:
+# taxon -> Eolimna minima
+# Nitzschia -> Nitzschia sp.
+# Nitzschia capitellata var. capitellata -> Nitzschia capitellata
+
+# Genus-Spalte:
+# Nitzschia -> Nitzschia
+# Nitzschia capitellata var. capitellata -> Nitschia
+
 
 
 dbDisconnect(con)
@@ -217,11 +239,15 @@ dia200 = dia[ , .N, by = taxon][order(-N)][N >= 200] #AS : 200 is just an exampl
 
 #AS: dplyr approach:
 setDF(dia)
-dia200 = dia %>%
+dia200 = dia_sam %>%
   group_by(taxon) %>%
   summarise(N = n()) %>%
   arrange(-N) %>%
-  filter(N >= 200)
+  filter(N > 1)
+
+taxa_fin = dia200$taxon
+
+dia_sam[ dia_sam$taxon %in% taxa_fin, ]
 
 plot(density(dia200$N))
 # taxon list
@@ -273,6 +299,8 @@ Delete rows where abundance was measured instead of cover
 
 join_cov <- select(join, taxon, sample_id, site_id, year, month, cover)
 join_cov <- join_cov[complete.cases(join_cov), ]
+#AS: better is.na()
+join_cov[!is.na(join_cov$cover), ]
 # 39583 of 45980 entries remain
 join_cov <- join_cov[!join_cov$cover=="0", ]
 # 39270 entries remain
@@ -285,6 +313,10 @@ join_cov <- join_cov[!join_cov$cover=="0", ]
 ##AS: no need to do this. Like this you have way to many objects in your envrionment.
 # you can always subset the data.frame when needed
 phch_samples[ date <= '2007-01-01' ] #! when data.table it works without comma. Otherwiose use comma after the string
+
+head(dia_sam)
+dia_sam %>%
+  group_by(year)
 
 join2005 <- subset(join, date < as.Date("2006-01-01"))
 join2006 <- subset(join, (date < as.Date("2007-01-01"))&(date > as.Date("2005-12-31")))
@@ -307,6 +339,9 @@ Prepare data for transformation.
 
 
 # Since iz_n (species abundance) is often empty,  I instead choose cover for abundance data.
+
+##AS: this does all the work
+dia_sam = dia_sam[ ,c(1:6,8,7)]
 
 # Create proper data format
 dia05 <- data.frame(join2005$taxon, join2005$site_id, join2005$date, join2005$year, join2005$month, as.numeric(join2005$cover))
@@ -343,6 +378,14 @@ sum(is.na(dia09$cover)) #981 # from 10581
 sum(is.na(dia10$cover)) #0   
 sum(is.na(dia11$cover)) #0
 sum(is.na(dia12$cover)) #5165 # from 8055
+
+head(dia_sam)
+dia_sam$year = format(dia_sam$date, '%Y')
+
+dia_sam %>%
+  group_by(year) %>%
+  filter(is.na(cover)) %>%
+  summarise(N = n())
 
 # Delete rows with missing values
 dia05 <- dia05[complete.cases(dia05), ]
@@ -407,7 +450,18 @@ dia %>%
 require(data.table)
 
 # Take the mean for aggregation
-cast05<- data.table::dcast(dia05, site_id ~ taxon, fill=0, fun=mean)
+
+##AS: List introduction:
+test = list(dia_sam, iris, dia_sam, 1, c('test', 'test2'), list(1,2))
+lapply(test, head) # list
+test[[2]]
+lapply(dia_sam, head) #data.frame (is list)
+dia_sam[1, ]
+dia_sam[ ,2]
+
+cast05<- data.table::dcast(dia_sam, site_id ~ taxon, fill=0, fun=mean)
+##AS: Multiple arguments in aggregation fiunction
+cast05<- data.table::dcast(dia_sam, site_id ~ taxon, fill=0, fun=function(x) quantile(x, 0.05))
 cast06<- data.table::dcast(dia06, site_id ~ taxon, fill=0, fun=mean)
 cast07<- data.table::dcast(dia07, site_id ~ taxon, fill=0, fun=mean)
 cast08<- data.table::dcast(dia08, site_id ~ taxon, fill=0, fun=mean)
@@ -449,10 +503,17 @@ dia[ ,
 
 # or dplyr:
 setDF(dia)
+dia_sam$year = format(dia_sam$date, '%Y')
 perc5 = function(x) quantile(x, 0.05, na.rm = TRUE)
-dia %>%
-  group_by(site_id) %>%
+dia_sam %>%
+  group_by(site_id, year) %>%
   summarise_at('cover', funs(mean, min, perc5))
+
+
+##AS: split data.frame into multiple data.frames and store in list
+dia_sam_year_list = split(dia_sam, dia_sam$year)
+dia_sam_year_list[[1]]
+
 
 require(dplyr)
 
@@ -637,10 +698,10 @@ Sampling days/sampling events per year
 ##AS: from here it's way too much code below:
 # You can create the same result by just a few lines:
 
-dia$month = format(dia$date, '%m')
+dia_sam$month = format(dia_sam$date, '%m')
 require(ggplot2)
 ## all rows
-dia_overview = dia[ , .N, by = .(year, month)]
+dia_overview = as.data.table(dia_sam)[ , .N, by = .(year, month)]
 
 ggplot(dia_overview, aes(y = N, x = month)) +
   geom_point() +
