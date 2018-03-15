@@ -9,7 +9,7 @@ editor_options:
   chunk_output_type: console
 ---
 
-## Setup
+# Setup
 
 Load the following packages and load the data base access scipt:
 
@@ -24,66 +24,95 @@ require(dplyr)
 require(vegan)
 require(ggplot2)
 require(gridExtra)
+require(stringr)
 
+## switch
+online = FALSE ##AS: added switch (see data loading chunks below)
 
 ## load access data
-path = getwd() #AS: necessary to make it run for me
+path = getwd() ##AS: necessary to make it run for me
 
 #path = 'D:/Gesa/Dokumente/Ecotoxicology/RPC'
 #path = '//SAMBASERVER/home/amel7631/Desktop/pesticides-organisms'
 source(file.path(path, 'amelung_access.R'))
 ```
 
-## Loading data
+# Loading data
 
-Query PostgresSQL data base: bfg_monitoring
+## Pesticide data
 
 ```{r load-PSM-data, echo=TRUE, message=FALSE}
-drv = dbDriver("PostgreSQL")
-con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
-
-psm_sites = dbGetQuery(con, "SELECT *
-                             FROM views.psm_sites_2005
-                       ")
-psm_sam = dbGetQuery(con, "SELECT *
-                               FROM views.psm_samples_2005 sam
-                               JOIN phch.phch_variables var 
-                              ON var.variable_id = sam.variable_id
-                         ORDER BY sam.sample_id
-                        ")
-psm_sam = psm_sam[ ,-c(16, 24)] # delete duplicate rows
+if (online) {
+  drv = dbDriver("PostgreSQL")
+  con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+  
+  psm_sites_geo = st_read_db(con, query = "SELECT *
+                                           FROM views.psm_sites_2005")
+  psm_sites = as.data.frame(psm_sites_geo)
+  psm_sam = dbGetQuery(con, "SELECT *
+                                 FROM views.psm_samples_2005 sam
+                                 JOIN phch.phch_variables var
+                                ON var.variable_id = sam.variable_id")
+  psm_sam = psm_sam[ ,-c(16, 24)] # delete duplicate rows
+  
+  dbDisconnect(con)
+  dbUnloadDriver(drv)
+  
+  saveRDS(psm_sites_geo, file.path('cache', 'psm_sites_geo.rds'))
+  saveRDS(psm_sites, file.path('cache', 'psm_sites.rds'))
+  saveRDS(psm_sam, file.path('cache', 'psm_sam.rds'))
+} else {
+  psm_sites_geo <- readRDS(file.path('cache', 'psm_sites_geo.rds'))
+  psm_sites <- readRDS(file.path('cache', 'psm_sites.rds'))
+  psm_sam <- readRDS(file.path('cache', 'psm_sam.rds'))
+}
 
 psm_sam = psm_sam %>%
   filter(psm_type == 'herbicide' & date > '2004-12-31')
+## AS: when the script is finished we could also consider applying it to all pesticides
 
 # Create column for year
 psm_sam$year <- format(psm_sam$date, '%Y')
-
-# save(psm_sam, file="psm_sam.RData")
-
-# 3246690
-# = herbicide: 1659335
-dbDisconnect(con)
-dbUnloadDriver(drv)
 ```
 
-Load diatom data
+## Diatom data
 ```{r load-diatom-data, echo=TRUE, message=FALSE}
-drv = dbDriver("PostgreSQL")
-con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+if (online) {
+  drv = dbDriver("PostgreSQL")
+  con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+  # dia_sites = dbGetQuery(con, "SELECT * FROM dia.dia_sites") ##AS: no need to extra load this
+  dia_sites_geo = st_read_db(con, query = "SELECT * FROM dia.dia_sites")
+  dia_sites = as.data.frame(dia_sites_geo)
+  dia_sam = dbGetQuery(con, "SELECT *
+                         FROM dia.dia_samples
+                         WHERE date > '2004-12-31'
+                         ")
+  dbDisconnect(con) ##AS: close beore doing the belwo changes
+  dbUnloadDriver(drv)
+  
+  saveRDS(dia_sites_geo, file.path('cache', 'dia_sites_geo.rds'))
+  saveRDS(dia_sites, file.path('cache', 'dia_sites.rds'))
+  saveRDS(dia_sam, file.path('cache', 'dia_sam.rds'))
 
-dia_sites = dbGetQuery(con, "SELECT * FROM dia.dia_sites")
-dia_sites_geo = st_read_db(con, query = "SELECT * FROM dia.dia_sites LIMIT 10")
-dia_sam = dbGetQuery(con, "SELECT *
-                       FROM dia.dia_samples
-                       WHERE date > '2004-12-31'
-                       ")
-# mapview(dia_sites_geo)
+} else {
+  
+  dia_sites_geo = readRDS(file.path('cache', 'dia_sites_geo.rds'))
+  dia_sites = readRDS(file.path('cache', 'dia_sites.rds'))
+  dia_sam = readRDS(file.path('cache', 'dia_sam.rds'))
+}
 
-# Create column for species name only. Add "sp." to those names that only have genera 
-dia_sam$species <- sub("^(\\S*\\s+\\S+).*", "\\1", dia_sam$taxon)
-dia_sam$species <- paste(dia_sam$species, "sp.")
-dia_sam$species <- sub("^(\\S*\\s+\\S+).*", "\\1", dia_sam$species)
+# Create column for species name only. Add "sp." to those names that only have genera ##AS: different approach (str_count() comes from stringr::)
+dia_sam$species <- gsub('[[:punct:]]', '', dia_sam$taxon) # remove punctuation characters
+dia_sam$species <- gsub('([a-z]+)\\s([a-z]+)(.+)*', '\\1 \\2', dia_sam$species) # reduce to two strings (removes: 'var', 'form')
+dia_sam$species <- ifelse(str_count(dia_sam$species, pattern = '\\s') == 0,
+                          paste0(dia_sam$species, ' sp.'),
+                          dia_sam$species)
+
+# dia_sam$species <- sub("^(\\S*\\s+\\S+).*", "\\1", dia_sam$taxon)
+# dia_sam$species <- paste(dia_sam$species, "sp.")
+# dia_sam$species <- sub("^(\\S*\\s+\\S+).*", "\\1", dia_sam$species)
+
+# table(str_count(dia_sam$species, pattern = '\\s')) # count space characters (only 1s should be left) ##AS: tests for two name taxa
 
 # Create column for genus name
 dia_sam$genus <- sub("^(\\S*).*", "\\1", dia_sam$taxon)
@@ -91,64 +120,77 @@ dia_sam$genus <- sub("^(\\S*).*", "\\1", dia_sam$taxon)
 # Create column for year
 dia_sam$year <- format(dia_sam$date, '%Y')
 dia_sam$month <- format(dia_sam$date, '%m')
-
-dbDisconnect(con)
-dbUnloadDriver(drv)
+dia_sam$day <- format(dia_sam$date, '%j') ##AS: Added day of the year
 ```
 
-Load physical-chemical data
-```{r load-phch-data, echo=TRUE, message=FALSE}
-drv = dbDriver("PostgreSQL")
-con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+## River network
+```{r load-river-network}
+if (online) {
+  drv = dbDriver("PostgreSQL")
+  con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+  
+  streams = st_read_db(con, query = "SELECT * FROM spatial.gewaessertyp")
+  
+  dbDisconnect(con)
+  dbUnloadDriver(drv)
+  
+  saveRDS(streams, file.path('cache', 'streams.rds'))
 
-# there are more sites than psm_sites (including only pesticides) though they aren't necessary for us.
-phch_sam = dbGetQuery(con, "SELECT *
-                                FROM phch.phch_samples sam
-                                LEFT JOIN phch.phch_variables var ON var.variable_id = sam.variable_id
-                                WHERE date > '2004-12-31' AND date < '2016-01-01'          
-                      ")
+} else {
+  
+  streams = readRDS(file.path('cache', 'streams.rds'))
+}
+```
+
+## Load physical-chemical data
+```{r load-phch-data, echo=TRUE, eval=FALSE, message=FALSE}
+if (online) {
+  drv = dbDriver("PostgreSQL")
+  con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+  # there are more sites than psm_sites (including only pesticides) though they aren't necessary for us.
+  phch_sam = dbGetQuery(con, "SELECT *
+                              FROM phch.phch_samples sam
+                              LEFT JOIN phch.phch_variables var ON var.variable_id = sam.variable_id
+                                  WHERE date > '2008-12-31' AND date < '2016-01-01'")
+  dbDisconnect(con)
+  dbUnloadDriver(drv)
+  
+  saveRDS(phch_sam, file.path('cache', 'phch_sam.rds'))
+} else {
+  phch_sam = readRDS(file.path('cache', 'phch_sam.rds'))
+}
+
 phch_sam = phch_sam[ , -c(16, 24)] #AS! removes duplicated unit, variable_id entries
-#phch_sam <- phch_sam %>%
-#  filter(date > '2004-12-31' & date < '2016-01-01')
-
-
-dbDisconnect(con)
-dbUnloadDriver(drv)
 ```
 
-```{r  read-taxalisten-data, echo=TRUE, message=FALSE}
-#samples_taxon <- merge(dia_sam_year, diatom_dat, by.x="dv", by.y="DV")
-#diatom_dat1<- read.table("C_Proben_Taxalisten.txt",header=T,sep="\t",dec=".")
-
-```
-
-## Compare datasets
+# Compare datasets
 
 Select all diatom samples where herbicides were measured at the same site in the same year.
 
-```{r  join-on-site-year, echo=TRUE, message=FALSE}
-# Diatom data 
-dia_sam <- semi_join(dia_sam, psm_sam, by = c("site_id", "year"))
-nrow(dia_sam)
-# 48,525 observations
 
+```{r join-on-site-year, echo=TRUE, message=FALSE}
+# Diatom data
+dia_sam2 <- semi_join(dia_sam, psm_sam, by = c("site_id", "year"))
+nrow(dia_sam2)
+##AS: this deletes a lot of entries, maybe keep it first for the CA analysis?
+# 48,525 observations
+##AS: like this you can keep it an sf-object:
+##AS: generally you can handle sf-Objects with dplyr like data.frames and tibbles
+dia_sites2 <- dia_sites_geo[ dia_sites_geo$site_id %in% psm_sites_geo$site_id, ]
 ```
 
 # Create single datasets for cover and for species abundance
 Delete rows where abundance was measured instead of cover
-```{r  delete-NAs, echo=TRUE, message=FALSE}
-
-dia_cov <- dia_sam[!is.na(dia_sam$cover), ]
+```{r delete-NAs, echo=TRUE, message=FALSE}
+dia_cov <- dia_sam2[!is.na(dia_sam2$cover), ]
 dia_cov <- dia_cov[,-6]   #delete column with abundance data since its mostly emtpy
-dia_n <- dia_sam[!is.na(dia_sam$iz_n), ]
 # Since iz_n (species abundance) is often empty,  I instead choose cover for abundance data.
-# Do not (yet) delete rows that contain zeros for cover or abundance.
-# Create column for year
-dia_cov <- dia_cov[! dia_cov$cover=="0", ]   #results in 88023 observations
+#dia_cov <- dia_cov[! dia_cov$cover=="0", ]   #results in 88023 observations
+##AS: Why do you exclude 0s?
 ```
 
 Select all phys-chem samples where diatoms were measured at the same site.
-```{r  join-phch, echo=TRUE, message=FALSE}
+```{r join-phch, echo=TRUE, message=FALSE}
 
 # Phyis-chem data
 # semi join on site_id to get only sites where diatoms where sampled as well.
@@ -160,32 +202,42 @@ nrow(phch_sam)
 ```
 
 
-## Taxon frequency
+# Taxon frequency
 Are there any rare species? Marchant (2002) suggests to remove rare species and Cao et al.(2001) suggests this if samples were taken over a large spatial scale which holds true for the present data. So the question is what a suitable definition for rare species is. E.g. species that occur in only 1 sample. Different approaches were performed in the literature.
 
 Here, species that occur only once in the whole dataset were removed as well as speices that occur only once in a given year.
 
 ```{r  taxon-frequency, echo=TRUE, message=FALSE}
-# Genus frequency
-# Only include species that are present more than once in the whole data set
-# Remove rare species
-dia1= dia_cov %>%
+##AS: with this approach you can remove species which occur in less than x% of the sites
+# e.g. Fernandez 2016 used only species which occurred at 20% of the sites
+site_idN = length(unique(dia_sam$site_id)) # count of unique sites
+# dplyr way
+dia_cov = dia_sam %>%
+  group_by(species) %>%
+  mutate(perc = n_distinct(site_id) / site_idN) %>%  # not aggregating
+  # summarise(perc = n_distinct(site_id) / site_idN) %>%
+  arrange(-perc) %>%
+  filter(perc >= 0.2)
+##AS: Is it better to do this with genus or species? Let's consider both
+
+## Remove rare species
+dia1 = dia_cov %>%
   group_by(species) %>%
   summarise(N = n()) %>%
   arrange(-N) %>%
   filter(N > 1)
 
+plot(density(dia1$N), main="species density")
+
 spec_list = sort(dia1$species)
-
-dia_cov <- dia_cov[ dia_cov$species %in% spec_list, ]
-nrow(dia_cov)
-plot(density(dia2$N), main="species density")
-
 length(spec_list)
 # 614 different diatom species
 
-# Genus frequency
-dia_gen = dia_cov %>%
+dia_cov2 <- dia_cov[ !dia_cov$species %in% spec_list, ]
+nrow(dia_cov2)
+
+## Genus frequency
+dia_gen = dia_cov2 %>%
   group_by(genus) %>%
   summarise(N = n()) %>%
   arrange(-N) 
@@ -202,14 +254,28 @@ plot(density(dia_gen$N), main="genus density")
 dia2 = dia_cov %>%
   group_by(year, species) %>%
   summarise(N = n()) %>%
-  arrange(-N) %>%
+  arrange(N) %>%
   filter(N > 1)
 
+##AS: this is somehow a strange construct:
+##AS: I'm not sure if this is correct
 dia_cov_year <- dia_cov %>%
-  inner_join(dia2, by=c("species", "year"))
+  inner_join(dia2, by=c("species", "year")) %>% 
+  arrange(-N)
 dia_cov_year = dia_cov_year[,-12 ]
 nrow(dia_cov_year)
 
+(as.data.table(dia_cov)[ , N := uniqueN(year), species ][order(-N)])
+
+##AS: group by species, count for each species the yearly occurence
+##AS: do you want to do sth like this?
+dia_cov %>% 
+  group_by(species) %>% 
+  mutate(N = n_distinct(year)) %>% 
+  arrange(-N) %>% 
+  select(species, N)
+
+##AS: same here:
 ##Species frequency per month
 # Remove rows with species that occur only once in the specific month
 dia3 = dia_cov %>%
@@ -289,9 +355,8 @@ It seems like the distribution of samples and sampling events is very similar. T
 First, for years
 Transform data from long to wide format. Take the 95th percentile for aggregation if several combinations of site_id and species are present Take first column and store as rowname.
 ```{r  transformation-95th, echo=TRUE, message=FALSE}
-
 # Aggreagate over all years
-setDF(dia_cov)
+##AS: I continued with species >20% sites
 dia_aggr <- dia_cov %>%
   group_by(species, site_id) %>%
   summarise(mean = mean(cover),
@@ -303,8 +368,9 @@ dia_aggr <- dia_cov %>%
 
 # aggregate for all years seperately
 # take data where rare species per year were removed.
-dia_aggr_year <- dia_cov_year %>%
-  group_by(year = format(dia_cov_year$date, '%Y'), species, site_id) %>%
+# dia_aggr_year <- dia_cov_year %>%
+dia_aggr_year <- dia_cov %>% 
+  group_by(year, species, site_id) %>%
   summarise(mean = mean(cover),
             perc95 = quantile(cover, 0.95, na.rm = TRUE),
             total = n()) %>%
@@ -315,25 +381,61 @@ dia_aggr_split <- split(dia_aggr_year, dia_aggr_year$year)
 # dia_aggr_split[["2005"]]inspect data structure
 
 
-cast_years <- lapply(dia_aggr_split, function(x) dcast(x, site_id ~ species, value.var="perc95", fill = 0))
+cast_years <- lapply(dia_aggr_split,
+                     function(x) dcast(x, site_id ~ species,
+                                       value.var="perc95", fill = 0))
 
-names(cast_years)
+##AS: you can change the rownames (and delete the 1st column) also with this:
+# you can leave the semi colon or \n would also work
+cast_years <- lapply(cast_years,
+                     function(x) { rownames(x) <- x[,1];
+                                   x[,1] <- NULL;
+                                   x })
+
+##AS: also remove rows where rowSums is 0. DCA can't deal with it
+# remove rows, where rowSums == 0. I.e. no cover from no species
+# This has to be done for environmental variables as well
+cast_years <- lapply(cast_years,
+       function(x) { x[rowSums(x) > 0,] })
+
 
 # Change rownames using the first column
-rownames(cast_years[["2005"]]) <- (cast_years[["2005"]][,1])
-rownames(cast_years[["2006"]]) <- (cast_years[["2006"]][,1])
-rownames(cast_years[["2007"]]) <- (cast_years[["2007"]][,1])
-rownames(cast_years[["2008"]]) <- (cast_years[["2008"]][,1])
-rownames(cast_years[["2009"]]) <- (cast_years[["2009"]][,1])
-rownames(cast_years[["2010"]]) <- (cast_years[["2010"]][,1])
-rownames(cast_years[["2011"]]) <- (cast_years[["2011"]][,1])
-rownames(cast_years[["2012"]]) <- (cast_years[["2012"]][,1])
-
+# rownames(cast_years[["2005"]]) <- (cast_years[["2005"]][,1])
+# rownames(cast_years[["2006"]]) <- (cast_years[["2006"]][,1])
+# rownames(cast_years[["2007"]]) <- (cast_years[["2007"]][,1])
+# rownames(cast_years[["2008"]]) <- (cast_years[["2008"]][,1])
+# rownames(cast_years[["2009"]]) <- (cast_years[["2009"]][,1])
+# rownames(cast_years[["2010"]]) <- (cast_years[["2010"]][,1])
+# rownames(cast_years[["2011"]]) <- (cast_years[["2011"]][,1])
+# rownames(cast_years[["2012"]]) <- (cast_years[["2012"]][,1])
 
 # Delete first column of each row object
-cast_years <- lapply(cast_years, function(x) {x["site_id"] <- NULL;x})
+# cast_years <- lapply(cast_years, function(x) {x["site_id"] <- NULL;x})
 ```
  
+## graphical inspection of years
+```{r ggplot-year}
+# overview plots
+
+length(unique(dia_cov$site_id)) ##AS: 712
+length(unique(dia_sam$site_id)) ##AS: 1194
+
+gr1 = ggplot(dia_sam, aes(y = site_id, x = month)) +
+  geom_raster(aes(fill = year)) +
+  facet_wrap( ~ year)
+gr1
+
+ggsave(gr1, width = 8, height = 5, filename = '/tmp/dia_sam.png')
+
+gr2 = ggplot(dia_cov, aes(y = site_id, x = year)) +
+  geom_raster(aes(fill = log10(cover+1)))
+gr2
+##AS: Maybe skip 2013/14?
+
+gr3 = ggplot(dia_cov) +
+  geom_raster(aes(y = site_id, x = day, fill = year))
+gr3
+```
 
 ## DCA
 Conduct DCA to see if axis length indicates unimodal response..
@@ -351,15 +453,14 @@ lapply(cast_years, function(x) {plot(decorana(x), display="both")})
 # Error in plot.new() : figure margins too large
 
 # summary(spec_dca05, digits=3, origin=TRUE, display="both")
-
-
 ```
+
 Conducting unimodal analysis would be okay for all years except for 2009. Also, the biplot for 2009 looks very strange, data points are only distributed along the first and the second axes.
 
 
 # Aggregation per month
 Calculation of the minimal cover per month and site and taxon over all years together.
-```{r  aggregation-month, echo=TRUE, message=FALSE}
+```{r aggregation-month, echo=TRUE, message=FALSE}
 dia_month <- select(dia_cov_month, species, site_id, month, cover) %>%
   group_by(month, site_id, species) %>%
   summarise_each(funs(min_cover = min(cover), mean_cover = mean(cover), perc95 = quantile(cover, 0.95), count = n())) %>%
@@ -369,7 +470,7 @@ nrow(dia_month)
 ```
 
 
-```{r  cast-month, echo=TRUE, message=FALSE}
+```{r cast-month, echo=TRUE, message=FALSE}
 # Store single years as seperate elements of a list
 dia_month_split <- split(dia_month, dia_month$month)
 names(dia_month_split)
@@ -401,7 +502,7 @@ In April and in November, only one site was sampled each. Further analysis there
 
 # DCA per month
 Is the length of the first axis long enough to indicate complete species turnover?
-```{r  dca-month, echo=TRUE, message=FALSE}
+```{r dca-month, echo=TRUE, message=FALSE}
 lapply(cast_months, function(x) {decorana(x)})
 lapply(cast_months, function(x) {plot(decorana(x), display="both")})
 ```
@@ -426,13 +527,29 @@ lapply(ca_y, function(x) {summary(x)})
 # Output could change depending on the aggregation method.
 ```
 
+## Ordination plots
+```{r ord-plots}
+##AS: use lapply ;)
+dianame <- lapply(cast_years, function(x) make.cepnames(names(x)))
+stems <- lapply(cast_years, colSums)
+
+for (i in 1:length(dianame)) {
+  plot(ca_y[[i]], dis="sp", type="n") #red crosses = species, dots = sites
+  orditorp(ca_y[[i]], dis="sp", lab=dianame[[i]], priority=stems[[i]],
+           pcol="darkgrey", pch="+")
+}
+```
+
 Include names in ordiplots.
 ```{r  ca_names, echo=TRUE, message=FALSE}
 # conduct CA
 ## 2005 ##
 ca05<-cca(cast_years[["2005"]])    #if a list object is taken to creae a plot, error occurs
+
+
 dianam05<-make.cepnames(names(cast_years[["2005"]]))
-# plot(ca05) 
+# plot(ca05)
+
 
 #identify(plot(ca05, dis="sp"), "sp", labels=dianam05) # individual selection of points which are labelled
 #now, points indicate species and not sites
@@ -523,6 +640,8 @@ Also, the CA biplot of July, August and September look very strange. Seems like 
 
 ## Environmental data
 ```{r get-variable-names, echo=TRUE, message=FALSE}
+##AS: HAb ich oben schon unter load physical-chemical reingeladen
+##as: würde ich heir löschen
 drv = dbDriver("PostgreSQL")
 con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
 
@@ -537,8 +656,19 @@ dbDisconnect(con)
 dbUnloadDriver(drv)
 ```
 
-Combine herbicide data and phyical chemical data to form environmental data set.
+Combine herbicide data and physical chemical data to form environmental data set.
+
+
+```{r envi-data}
+names(phch_sam)
+
+```
+
+
+
+
 ```{r select-envi-variables, echo=TRUE, message=FALSE}
+##AS: Eigentlich braucht es den Schritt nicht da alle PSM-Daten sowies auch in phch_sam drinnen sind.
 envi <- bind_rows(psm = psm_sam, phch = phch_sam, .id="id") %>%
   select(site_id, date, value_fin, unit, name, psm) 
 
@@ -676,3 +806,5 @@ dbUnloadDriver(drv)
 ```
 
 Data is very inclomplete.
+##AS: We don't need data for every single algae. We can aggregate all Freshwater algae.
+
