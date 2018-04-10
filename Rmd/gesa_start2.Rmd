@@ -615,52 +615,25 @@ for (i in 1:length(dianame_long_m_ge)) {
 
 
 ## Environmental data
-```{r get-variable-names, echo=TRUE, message=FALSE}
-##AS: HAb ich oben schon unter load physical-chemical reingeladen
-##as: würde ich heir löschen
-drv = dbDriver("PostgreSQL")
-con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
-
-
-var_names = dbGetQuery(con, "SELECT DISTINCT var.name
-                                FROM phch.phch_samples sam
-                                JOIN phch.phch_variables var ON var.variable_id = sam.variable_id
-                                ")
-# Nitrit, Nitrat-Stickstoff, Kalium, Sichttiefe, Chlorid, Nitrat, Gesamt-Phosphor, Sauerstoffgehalt, Sauerstoffzehrung nach 5 (7) Tagen ohne Hemmer, Gesamt-Stickstoff, Stickstoff, Wasserstand (OFW), pH-Wert (Feld) Ammonium-Stickstoff, Sauerstoffzehrung nach 7 Tagen mit Hemmer, BSB5, sedimentiert, Sauerstoffzehrung nach 21 Tagen mit Hemmer, TrÃ¼bung (physiko-chem. Messung), Elektrische LeitfÃ¤higkeit (20Â°C), Nitrit-Stickstoff, Natrium, Sulfat, Ammonium, Abfluss, spektraler Absorptionskoeffizient 436nm, freie KohlensÃ¤ure, SauerstoffsÃ¤ttigung, Stickstoff, Hydrogenkarbonat, Eisen, Wassertemperatur, Magnesium, Gesamtphosphor als PO4, Phosphor, Chemischer Sauerstoffbedarf
-
-dbDisconnect(con)
-dbUnloadDriver(drv)
-```
-
-Combine herbicide data and physical chemical data to form environmental data set.
-
-
-```{r envi-data}
-names(phch_sam)
-
-```
-
-
-
 
 ```{r select-envi-variables, echo=TRUE, message=FALSE}
-##AS: Eigentlich braucht es den Schritt nicht da alle PSM-Daten sowies auch in phch_sam drinnen sind.
-envi <- bind_rows(psm = psm_sam, phch = phch_sam, .id="id") %>%
-  select(site_id, date, value_fin, unit, name, psm) 
+herb_list = phch_sam %>%
+  filter(psm_type == 'herbicide') %>%
+  distinct(name) %>%
+  arrange(name)
 
-envi <- envi %>%
+nrow(herb_list)
+
+phch <- phch_sam %>%
   filter(psm == 'TRUE' | name %in% c("Nitit", "Nitrat-Stickstoff", "Kalium", "Chlorid", "Nitrat", "Gesamt-Phosphor", "Sauerstoffgehalt", "Gesamt-Stickstoff", "Stickstoff", "pH-Wert (Feld)", "Ammonium-Stickstoff", "BSB5", "Nitrit-Stickstoff", "Natrium", "Sulfat", "Ammonium", "Abfluss", "Stickstoff", "Hydrogenkarbonat", "Eisen", "Wassertemperatur", "Magnesium", "Phosphor", "Chemischer Sauerstoffgehalt"))
 
 # 6,768,652 observations
-envi <- envi[! envi$value_fin =="0",]   # if value is zero, then limit of quantification was not reached
-nrow(envi)
+phch_sam <- phch_sam[! phch_sam$value_fin =="0",]   # if value is zero, then limit of quantification was not reached
+nrow(phch_sam)
 # 481,178 observations
 
-# Create column for year
-envi$year <- format(envi$date, '%Y')
-
 # Change order of columns
-envi = envi[ ,c(1:2,7, 3:6)]
+#envi = envi[ ,c(1:2,7, 3:6)]
 
 ##########################################
 # Convert water temperature from celsius to kelvin
