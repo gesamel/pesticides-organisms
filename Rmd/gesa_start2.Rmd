@@ -195,6 +195,7 @@ nrow(dia_sam_cca)
 ```
 
 All  physical-chemical data were deleted that were not taken at a diatom sampling site.
+--> Nochmal neu berechnen wenn weitere Monate rausgeschmissen wurden.
 ```{r join-phch, echo=TRUE, message=FALSE}
 phch_sam <- semi_join(phch_sam, dia_sam_cca, by ="site_id")
 length(unique(phch_sam$site_id)) 
@@ -210,6 +211,137 @@ dia_sam <- dia_sam[,-6]    #delete column with abundance data since its mostly e
 dia_sam_cca <- dia_sam_cca[!is.na(dia_sam_cca$cover), ]
 dia_sam_cca <- dia_sam_cca[,-6] 
 ```
+
+## Visualization of the sampling frequency
+
+Sampling days and sampling events per year.
+
+```{r sampling-days-per-year, echo=TRUE, message=FALSE}
+## Number of samples
+
+# Count number of samples per month and year
+sample_count_ym = dia_sam %>%
+  group_by(year, month) %>%
+  summarise(N = n()) %>%
+   as.data.frame()
+
+# Count number of samples per year
+sample_count_y = dia_sam %>%
+  group_by(year) %>%
+  summarise(N = n()) %>%
+   as.data.frame()
+
+## Number of sampling events
+
+# Count number of sampling events (id_pn) per year
+event_count_y <- dia_sam %>% 
+  group_by(year) %>%
+  summarise(N = n_distinct(id_pn))  %>%
+   as.data.frame()
+
+# Count number of sampling events per month and year
+event_count_ym <- dia_sam %>% 
+  group_by(year, month) %>%
+  summarise(N = n_distinct(id_pn))  %>%
+   as.data.frame()
+
+## Plots
+
+# Plot: Number of samples per month and year
+gg1 <- ggplot(sample_count_ym, aes(y = N, x = month)) +
+  geom_point() +
+  facet_wrap( ~ year) +
+  ggtitle ("number of diatom samples per month and year")
+gg1
+
+# Plot: Number of sampling events per month and year
+gg2 <- ggplot(event_count_ym, aes(y = N, x = month)) +
+  geom_point() +
+  facet_wrap( ~ year) +
+  ggtitle ("number of diatom sampling events per month and year")
+gg2
+
+## Plot: Sampling counts per year & Event counts per year
+gg3 <- ggplot(dia_sam, aes(x=year)) +
+  geom_bar() +
+  labs(title="diatom samples per year", x = "year", y = "sample counts")
+
+gg4 <- ggplot(event_count_y, aes(x=year, y = N)) +
+  geom_bar(stat="identity") +
+  labs(title="events per year", x = "year", y = "event counts")
+
+grid.arrange(gg3, gg4, ncol=2)
+
+# number of samples per month
+gg5 <- ggplot(dia_sam, aes(x=month)) +
+  geom_bar() +
+  labs(title="diatom samples per month", x = "month", y = "number of samples")
+gg5
+ggsave(gg5, width = 4, height = 4, filename = "figures/n_month.png")
+
+# number of samples per month and year
+gg6 <- ggplot(sample_count_ym, aes(y = N, x = year)) +
+  geom_point() +
+  facet_wrap( ~ month) +
+  ggtitle ("number of diatom samples per year and month")
+gg6
+ggsave(gg6, width = 10, height = 10, filename = "figures/n_my.png")
+
+sam_ym <- dcast(sample_count_ym, year ~ month, fill = "-")
+
+# number of sampes per day
+gg07 <- ggplot(dia_sam[dia_sam$month=="07",], aes(x=day)) +
+  geom_bar() +
+  ylim(0, 1750) +
+  labs(title="diatom samples per day - July", x = "day", y = "number of samples")
+
+gg08 <- ggplot(dia_sam[dia_sam$month=="08",], aes(x=day)) +
+  geom_bar() +
+  ylim(0, 1750) +
+  labs(title="diatom samples per day - August", x = "day", y = "number of samples")
+
+gg09 <- ggplot(dia_sam[dia_sam$month=="09",], aes(x=day)) +
+  geom_bar() +
+  ylim(0, 1750) +
+  labs(title="diatom samples per day - September", x = "day", y = "number of samples")
+
+gg7 <- grid.arrange(gg07, gg08, gg09, ncol=3)
+ggsave(gg7, width = 22, height = 10, filename = "figures/n_july_sept.png")
+
+```
+
+It seems like the distribution of samples and sampling events is very similar. This means that on every sampling day and event, a similar number of samples was taken. 
+
+One month of the early and the late application season, respectively, were to be chosen for further analysis. Even though most samples were available for the month August, to compare July and September seemed more suitable. 
+
+```{r herbicides-sampling-overview, echo=TRUE, message=FALSE}
+psm_count_ym = phch_sam %>%
+  filter(psm == TRUE) %>%
+  group_by(year, month) %>%
+  summarise(N = n()) %>%
+   as.data.frame()
+
+psm_gg1 <- ggplot(phch_sam[phch_sam$psm==TRUE,], aes(x=month)) +
+  geom_bar() +
+  labs(title="herbicide samples per month", x = "month", y = "number of samples")
+psm_gg1
+ggsave(psm_gg1, width = 4, height = 4, filename = "figures/n_psm_month.png")
+
+psm_gg2<- ggplot(psm_count_ym, aes(y = N, x = year)) +
+  geom_point() +
+  facet_wrap( ~ month) +
+  ggtitle ("number of herbicide samples per year and month")
+psm_gg2
+ggsave(psm_gg2, width = 10, height = 10, filename = "figures/n_psm_my.png")
+
+psm_gg3 <- ggplot(phch_sam[phch_sam$psm==TRUE,], aes(x=year)) +
+  geom_bar() +
+  labs(title="herbicide samples per year", x = "year", y = "sample counts")
+psm_gg3
+```
+
+Herbicides were sampled in all month with a high intensity. Generally, less samples were taken in the winter months. According to this continuous high amount of data, no months have to be excluded based on that. The amount of diatom data would be the more conservative proxy to gudge which months are appropriate to use for further analyses.
+In 2015, almost no herbicide samples were taken. Also, the year 2014 was not so frequently sampled.
 
 ## Taxon frequency
 [@Marchant.2002] suggests to remove rare species as only common species produce information that can reliably be linked to present environmental gradients. [@Cao.2001] suggests the removal of rare species if samples were taken over a large spatial scale which holds true for the present dataset. Furthermore, Chi-square distance, which is the distance measure used in CA and CCA, gives more weight to rare species. Due to this reason, [@Legendre.2012] suggest to remove rare species from the analysis. Here, species that occur at less than 20 % of the sites were remove. 
@@ -291,73 +423,6 @@ plot(density(dia_sam_N$N), main="Species density")
 
 ```
 The distribution of species frequency is very left-skewed. Most species are present in less than 500 times after removal of rare species.
-
-## Visualization of the sampling frequency
-
-Sampling days and sampling events per year.
-
-```{r sampling-days-per-year, echo=TRUE, message=FALSE}
-## Number of samples
-
-# Count number of samples per month and year
-sample_count_ym = dia_sam %>%
-  group_by(year, month) %>%
-  summarise(N = n()) %>%
-   as.data.frame()
-
-# Count number of samples per year
-sample_count_y = dia_sam %>%
-  group_by(year) %>%
-  summarise(N = n()) %>%
-   as.data.frame()
-
-## Number of sampling events
-
-# Count number of sampling events (id_pn) per year
-event_count_y <- dia_sam %>% 
-  group_by(year) %>%
-  summarise(N = n_distinct(id_pn))  %>%
-   as.data.frame()
-
-# Count number of sampling events per month and year
-event_count_ym <- dia_sam %>% 
-  group_by(year, month) %>%
-  summarise(N = n_distinct(id_pn))  %>%
-   as.data.frame()
-
-## Plots
-
-# Plot: Number of samples per month and year
-ggplot(sample_count_ym, aes(y = N, x = month)) +
-  geom_point() +
-  facet_wrap( ~ year) +
-  ggtitle ("Number of samples per month and year")
-
-# Plot: Number of sampling events per month and year
-ggplot(event_count_ym, aes(y = N, x = month)) +
-  geom_point() +
-  facet_wrap( ~ year) +
-  ggtitle ("Number of sampling events per month and year")
-
-## Plot: Sampling counts per year & Event counts per year
-gg1 <- ggplot(dia_cov, aes(x=year)) +
-  geom_bar() +
-  labs(title="Sample counts per year", x = "year", y = "sample counts")
-
-gg2 <- ggplot(event_count_y, aes(x=year, y = N)) +
-  geom_bar(stat="identity") +
-  labs(title="Event counts per year", x = "year", y = "event counts")
-
-grid.arrange(gg1, gg2, ncol=2)
-
-gg3 <- ggplot(dia_sam, aes(x=month)) +
-  geom_bar() +
-  labs(title="Samples per month", x = "month", y = "number of samples")
-gg3
-
-```
-
-It seems like the distribution of samples and sampling events is very similar. This means that on every sampling day and event, a similar number of samples was taken. For the years 2013 and 2014, only few data are available, they should therefore be removed before any further analyses. Also, if aggregation is to be done per month over all years, March, April and November should be removed since there are only few data available.
 
 ## Transform data to get from long to wide data
 
