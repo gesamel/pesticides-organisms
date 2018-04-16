@@ -170,7 +170,12 @@ if (online) {
 phch_sam = phch_sam[ , -c(16, 24)] # removes duplicated unit, variable_id entries
 
 # Get only data that are not psm or psm = herbicide
-phch_sam <- phch_sam[phch_sam$psm_type%in%c("herbicide", ""),]
+#phch_sam <- phch_sam[phch_sam$psm_type%in%c("herbicide", ""),] # 9,620,631 datapoints
+# get onlly data that are no chemicals or are herbicides.
+phch_sam <- phch_sam %>%
+  filter(casnr =="" | psm_type=="herbicide")
+# 5,268,995 datapoints
+nrow(phch_sam[phch_sam$casnr=="",])
 
 phch_sam$year <- format(phch_sam$date, '%Y')  # Create column for year
 phch_sam$month <- format(phch_sam$date, '%m') # Create column for month
@@ -178,14 +183,47 @@ phch_sam$day <- format(phch_sam$date, '%j')   # Create column for day of the yea
 
 ```
 
+### Load ec50 data
+
+```{r load-ec50-data, echo=TRUE, message=FALSE}
+if (online) {
+  drv = dbDriver("PostgreSQL")
+  con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+ec50 = dbGetQuery(con, "SELECT casnr, subst_name, ec50f_al4896_fin
+                                FROM phch.phch_ec50_fin
+                  ")
+  dbDisconnect(con)
+  dbUnloadDriver(drv)
+  
+  saveRDS(ec50, file.path('cache', 'ec50.rds'))
+} else {
+  ec50 = readRDS(file.path('cache', 'ec50.rds'))
+}
+```
+
+Join physica-chemical data with EC50 data.
+```{r join-ec50}
+# Join phch with ec50 to include casnr
+phch_sam = left_join(phch_sam, ec50, by = "casnr")
+
+# Remove all rows that are pesticides but don't have a ec50f_al4896_fin  entry
+# Keep all rows that have a EC50 valueor that are no pesticides.
+
+phch_sam = phch_sam %>%
+  filter(!ec50f_al4896_fin=="" | psm == FALSE)
+
+```
+
+
 ## Data preparation
 
-For the CCA later on, a dataset was created containing only diatom samples where herbicides were measured at the same site in the same year (`dia_sam_cca`). For the CA, all samples were retained in order to have a larger dataset  (`dia_sam`).
+For the CCA later on, a dataset was created containing only diatom samples where herbicides were measured at the same site in the same month (`dia_sam_cca`). For the CA, all samples were retained in order to have a larger dataset  (`dia_sam`).
 
 ```{r join-on-site-year, echo=TRUE, message=FALSE}
 # Diatom data
 
-dia_sam_cca <- semi_join(dia_sam, phch_sam[phch_sam$psm==TRUE,], by = c("site_id", "year"))
+dia_sam_cca <- semi_join(dia_sam, phch_sam[phch_sam$psm==TRUE,], by = c("site_id", "month"))
 nrow(dia_sam_cca)
 
 ##AS: like this you can keep it an sf-object:
@@ -193,12 +231,6 @@ nrow(dia_sam_cca)
 #dia_sites_cca <- dia_sites_geo[ dia_sites_geo$site_id %in% psm_sites_geo$site_id, ]
 ```
 
-All  physical-chemical data were deleted that were not taken at a diatom sampling site.
---> Nochmal neu berechnen wenn weitere Monate rausgeschmissen wurden.
-```{r join-phch, echo=TRUE, message=FALSE}
-phch_sam <- semi_join(phch_sam, dia_sam_cca, by ="site_id")
-length(unique(phch_sam$site_id)) 
-```
 
 ### Usage of cover data as quantitative variable
 In most cases, diatom cover was measured instead of abundance. Therefore, rows where abundance was measured were deleted. Instead, the cover data is used as the quantitative variable in the following analyses. The deletion of irrelevant rows was performed for the datasets for CA and CCA seperately.
@@ -343,8 +375,10 @@ Herbicides were sampled in all month with a high intensity. Generally, less samp
 In 2015, almost no herbicide samples were taken. Also, the year 2014 was not so frequently sampled.
 
 ```{r remove-months}
-
 dia_sam = dia_sam %>%
+  filter(month %in% c("07", "08", "09"))
+
+dia_sam_cca = dia_sam_cca %>%
   filter(month %in% c("07", "08", "09"))
   
 ```
@@ -356,119 +390,70 @@ The analysis was done for both, species and genus data and therefore, all proced
 ) were most sensitive to the herbicides whereas pennates (Cymbellales, Naviculales and Bacillariales)
 ) were more robust.
 
-```{r  taxon-frequency, echo=TRUE, message=FALSE}
-##  species which occurred at 20 % of the sites
-site_idN = length(unique(dia_sam$site_id)) # count of unique sites
+```{r  delete-rare-taxa, echo=TRUE, message=FALSE}
+## Rare = taxa that occur at less than 5 % of the samples
+sampleN = length(unique(dia_sam$id_pn))
 n_sp <- length(unique(dia_sam$species))
 n_ge <- length(unique(dia_sam$genus))
 
-# Rare genera
-dia_sam_20ge = dia_sam %>%
+## Rare genera
+dia_sam_ge = dia_sam %>%
   group_by(genus) %>%
-  mutate(perc = n_distinct(site_id) / site_idN) %>%
+  mutate(perc = n_distinct(id_pn) / sampleN) %>%
   arrange(-perc) %>%
-  filter(perc >= 0.2)
+  filter(perc >= 0.05)
 
 # precentage of genera remaining after removal of rare genera
-n_ge_abu <-length(unique(dia_sam_20ge$genus)) #32
+n_ge_abu <-length(unique(dia_sam_ge$genus)) #44
 n_ge_abu
-n_ge_abu/n_ge*100 # 41.5 %
+n_ge_abu/n_ge*100 # 57.1 %
 
 # Plot
-dia_sam_N_20ge = dia_sam_20ge %>%
+dia_sam_N_ge = dia_sam_ge %>%
        group_by(genus) %>%
        summarise(N=n())
-plot(density(dia_sam_N_20ge$N), main="Genus density")
+plot(density(dia_sam_N_ge$N), main="Genus density")
 
-# Rare species
-
-dia_sam_20sp = dia_sam %>%
+## Rare species
+dia_sam_sp = dia_sam %>%
   group_by(species) %>%
-  mutate(perc = n_distinct(site_id) / site_idN) %>%  # not aggregating
-  # summarise(perc = n_distinct(site_id) / site_idN) %>%
+  mutate(perc = n_distinct(id_pn) / sampleN) %>%
   arrange(-perc) %>%
-  filter(perc >= 0.2)
+  filter(perc >= 0.05)
 
-# precentage of species remaining after removal of rare species
-n_sp_abu <- length(unique(dia_sam_20sp$species))
-n_sp_abu #71
-n_sp_abu/sp_n*100 #8.2 %
+# precentage of genera remaining after removal of rare genera
+n_sp_abu <-length(unique(dia_sam_sp$species)) # 153
+n_sp_abu
+n_sp_abu/n_sp*100 # 17.7 %
 
 # Plot
-dia_sam_N_20sp = dia_sam_20sp %>%
+dia_sam_N_sp = dia_sam_sp %>%
        group_by(species) %>%
        summarise(N=n())
-plot(density(dia_sam_N_20sp$N), main="Species density")
+plot(density(dia_sam_N_sp$N), main="Species density")
 
-###########################################################################################
+## Rare genera of dia_sam_cca dataset
+sampleN_cca = length(unique(dia_sam_cca$id_pn))
+n_ge_cca <- length(unique(dia_sam_cca$genus))
 
-## Rare = species that occur at less than 5 % of the samples
-sampleN = length(unique(dia_sam$id_pn))
-
-# Rare genera
-dia_sam_5ge = dia_sam %>%
+## Rare genera
+dia_sam_ge_cca = dia_sam_cca %>%
   group_by(genus) %>%
-  mutate(perc = n_distinct(id_pn) / sampleN) %>%
+  mutate(perc = n_distinct(id_pn) / sampleN_cca) %>%
   arrange(-perc) %>%
   filter(perc >= 0.05)
 
 # precentage of genera remaining after removal of rare genera
-n_5ge_abu <-length(unique(dia_sam_5ge$genus)) #44
-n_5ge_abu
-n_5ge_abu/n_ge*100 # 57.1 %
+n_ge_abu_cca <-length(unique(dia_sam_ge_cca$genus)) #43
+n_ge_abu_cca
+n_ge_abu_cca/n_ge_cca*100 # 59.7 %
 
 # Plot
-dia_sam_N_5ge = dia_sam_5ge %>%
+dia_sam_N_ge_cca = dia_sam_ge_cca %>%
        group_by(genus) %>%
        summarise(N=n())
-plot(density(dia_sam_N_5ge$N), main="Genus density")
+plot(density(dia_sam_N_ge_cca$N), main="Genus density")
 
-# Rare species
-dia_sam_5sp = dia_sam %>%
-  group_by(species) %>%
-  mutate(perc = n_distinct(id_pn) / sampleN) %>%
-  arrange(-perc) %>%
-  filter(perc >= 0.05)
-
-# precentage of genera remaining after removal of rare genera
-n_5sp_abu <-length(unique(dia_sam_5sp$species)) # 153
-n_5sp_abu
-n_5sp_abu/n_sp*100 # 17.7 %
-
-# Plot
-dia_sam_N_5sp = dia_sam_5sp %>%
-       group_by(species) %>%
-       summarise(N=n())
-plot(density(dia_sam_N_5sp$N), main="Species density")
-
-
-
-## Remove rare species
-#dia1 = dia_cov %>%
-#  group_by(species) %>%
-#  summarise(N = n()) %>%
-#  arrange(-N) %>%
-#  filter(N > 1)
-
-#plot(density(dia1$N), main="species density")
-
-#spec_list = sort(dia1$species)
-#length(spec_list)
-# 614 different diatom species
-
-#dia_cov2 <- dia_cov[ !dia_cov$species %in% spec_list, ]
-#nrow(dia_cov2)
-
-## Genus frequency
-#dia_gen = dia_cov2 %>%
-#  group_by(genus) %>%
-#  summarise(N = n()) %>%
-#  arrange(-N) 
-
-#gen_list = sort(dia_gen$genus)
-#length(gen_list)
-
-#plot(density(dia_gen$N), main="genus density")
 
 ```
 
@@ -480,7 +465,6 @@ For the subsequent analysis, the data needed to be transformend from long to wid
 ```{r ggplot-year}
 # overview plots
 
-length(unique(dia_cov$site_id)) ##AS: 712
 length(unique(dia_sam$site_id)) ##AS: 1194
 
 gr1 = ggplot(dia_sam, aes(y = site_id, x = month)) +
@@ -500,16 +484,16 @@ gr3 = ggplot(dia_cov) +
 gr3
 ```
 
-
 ### Aggregation per month
 
 The data were aggregated per month by the 95th percentile of the cover. The data were then transformed from long to wide format.
 
 Diatom communities follow a seasonal succession which might be more prominent than the interanual succession. (@Hausmann.2007) showed that for lakes, the spring and summer conditions had a strong impact on the diatom composition and productivity that was stronger than the impact of changing annual mean temperatures. Similarly,  (@Kirilova.2008) observed a seasonal succession of diatoms in  lakes. The predominant diatoms in winter and spring were of the genus *Stephanodiscus* while species of the genera *Stephanodiscus*, *Fragilaria*, and *Nitzschia* were the most abundant diatoms in summer and autumn. To account for this seasonal variability of diatom composition, it seemed reasonable to summarize the diatom data for each month over all years.
  
-##### Species -  >20 % sites             
-```{r cast-month, echo=TRUE, message=FALSE}
-dia_aggr_month_20sp <- dia_sam_20sp %>% 
+#### Species
+
+```{r cast-species, echo=TRUE, message=FALSE}
+dia_aggr_sp <- dia_sam_sp %>% 
   group_by(month, species, site_id) %>%
   summarise(mean = mean(cover),
             perc95 = quantile(cover, 0.95, na.rm = TRUE),
@@ -517,30 +501,25 @@ dia_aggr_month_20sp <- dia_sam_20sp %>%
   arrange(species)
 
 # Store single years as seperate elements of a list
-dia_aggr_split_m <- split(dia_aggr_month, dia_aggr_month$month)
+dia_aggr_split_sp <- split(dia_aggr_sp, dia_aggr_sp$month)
 
-cast_months <- lapply(dia_aggr_split_m, function(x) dcast(x, site_id ~ species, value.var="perc95", fill = 0))
+cast_sp <- lapply(dia_aggr_split_sp, function(x) dcast(x, site_id ~ species, value.var="perc95", fill = 0))
 
 # Take the first column and store it as a rowname, afterwards, delete the first column.
-cast_months <- lapply(cast_months,
+cast_sp <- lapply(cast_sp,
                      function(x) { rownames(x) <- x[,1];
                                    x[,1] <- NULL;
                                    x })
 
 # Remove rows where the row sum is zero.
-cast_months <- lapply(cast_months,
+cast_sp <- lapply(cast_sp,
        function(x) { x[rowSums(x) > 0,] })
-
-# names(cast_months)
-# Remove the months March and November since there is not enough data.
-cast_months[["03"]] <- NULL
-cast_months[["04"]] <- NULL
-cast_months[["11"]] <- NULL
 ```
 
-#### Genus < 20 % sites
-```{r cast-month-ge, echo=TRUE, message=FALSE}
-dia_aggr_20ge <- dia_sam_20ge %>% 
+#### Genus
+
+```{r cast-genus, echo=TRUE, message=FALSE}
+dia_aggr_ge <- dia_sam_ge %>% 
   group_by(month, genus, site_id) %>%
   summarise(mean = mean(cover),
             perc95 = quantile(cover, 0.95, na.rm = TRUE),
@@ -548,223 +527,119 @@ dia_aggr_20ge <- dia_sam_20ge %>%
   arrange(genus)
 
 # Store single months as seperate elements of a list
-dia_aggr_split_20ge <- split(dia_aggr_20ge, dia_aggr_20ge$month)
+dia_aggr_split_ge <- split(dia_aggr_ge, dia_aggr_ge$month)
 
-cast_20ge <- lapply(dia_aggr_split_20ge, function(x) dcast(x, site_id ~ genus, value.var="perc95", fill = 0))
+cast_ge <- lapply(dia_aggr_split_ge, function(x) dcast(x, site_id ~ genus, value.var="perc95", fill = 0))
 
 # Take the first column and store it as a rowname, afterwards, delete the first column.
-cast_20ge <- lapply(cast_20ge,
+cast_ge <- lapply(cast_ge,
                      function(x) { rownames(x) <- x[,1];
                                    x[,1] <- NULL;
                                    x })
 
 # Remove rows where the row sum is zero.
-cast_20ge <- lapply(cast_20ge,
+cast_ge <- lapply(cast_ge,
        function(x) { x[rowSums(x) > 0,] })
 ```
 
-#### DCA per month
+#### Genus - CCA dataset
+
+```{r cast-genus-cca, echo=TRUE, message=FALSE}
+dia_aggr_ge_cca <- dia_sam_ge_cca %>% 
+  group_by(month, genus, site_id) %>%
+  summarise(mean = mean(cover),
+            perc95 = quantile(cover, 0.95, na.rm = TRUE),
+            total = n()) %>%
+  arrange(genus)
+
+# Store single months as seperate elements of a list
+dia_aggr_split_ge_cca <- split(dia_aggr_ge_cca, dia_aggr_ge_cca$month)
+
+cast_ge_cca <- lapply(dia_aggr_split_ge_cca, function(x) dcast(x, site_id ~ genus, value.var="perc95", fill = 0))
+
+# Take the first column and store it as a rowname, afterwards, delete the first column.
+cast_ge_cca <- lapply(cast_ge_cca,
+                     function(x) { rownames(x) <- x[,1];
+                                   x[,1] <- NULL;
+                                   x })
+
+# Remove rows where the row sum is zero.
+cast_ge_cca <- lapply(cast_ge_cca,
+       function(x) { x[rowSums(x) > 0,] })
+```
+
+### DCA
 
 A Detrended Correspondance Analysis (DCA) was performed in order to decide whether it is appropriate to conduct a unimodal gradient method. DCA was introduced by (@Hill.1980). If the length of the first DCA axis, scaled in units of standard deviations (S.D.), is > 4 S.D. a complete species turnover can be assumed and a unimodal gradient method is appropriate to use. A linear gradient method would be more appropriate for a length of the first axes < 3 S.D., indicating an incomplete change of species composition. For an axis length between 3 and 4, both types of methods are appropriate to use (@Leps.2003).
 
-##### Species
+#### Species
 
-```{r dca-month, echo=TRUE, message=FALSE}
-lapply(cast_months, function(x) {decorana(x)})
-lapply(cast_months, function(x) {plot(decorana(x), display="both")})
+```{r dca-species, echo=TRUE, message=FALSE}
+lapply(cast_sp, function(x) {decorana(x)})
+lapply(cast_sp, function(x) {plot(decorana(x), display="both")})
 ```
 The legth of the first axis is > 3 S.D. in all months and therefore, a unimodal gradient can be assumed for all months.
 
-##### Genus
-```{r dca-month-ge, echo=TRUE, message=FALSE}
-lapply(cast_months_20ge, function(x) {decorana(x)})
-lapply(cast_months_20ge, function(x) {plot(decorana(x), display="both")})
+#### Genus
+```{r dca-genus, echo=TRUE, message=FALSE}
+lapply(cast_ge, function(x) {decorana(x)})
+lapply(cast_ge, function(x) {plot(decorana(x), display="both")})
 ```
 
-Also for genus data, the length of the irst axis is > 3 S.D. in all months and therefore, a unimodal gradient can be assumed for all months.
+Also for genus data, the length of the first axis is > 3 S.D. in all months and therefore, a unimodal gradient can be assumed for all months.
+
+#### Genus - CCA
+```{r dca-genus-cca-dataset, echo=TRUE, message=FALSE}
+lapply(cast_ge_cca, function(x) {decorana(x)})
+lapply(cast_ge_cca, function(x) {plot(decorana(x), display="both")})
+```
+
+For genus data for the cca, the length of the first axis is > 4 S.D. in all months and therefore, a unimodal gradient can be assumed for all months.
 
 ## CA
 
 Correspondance Analysis (CA) was used to determine the major trends of variation of the diatom community before including any environmental data. CA is an ordination method and hence reduces data of multidimensional space to a 2- or 3-dimensional representation with minimal loss of information. The dimensions included in the ordination plot are the ones with the highest amount of variance and thus display the greatest part of variability of the data. The advantage of CA is that, by using weighted averages ordination, sites and species are ordered at the same time into the same space. In the ordination plot, similar communities and species are close together while dissimilar communities and species are further apart.
 
-### CA per month
+### Species
 
-#### Species
-
-```{r  ca-month, echo=TRUE, message=FALSE}
+```{r  ca-species, echo=TRUE, message=FALSE}
 # conduct CA
-ca_m <-lapply(cast_months, function(x) {cca(x)})
+ca_sp <-lapply(cast_sp, function(x) {cca(x)})
 
 # Compute summary of CA results to inspect proportion of variance explained by each axis.
-lapply(ca_m, function(x) {summary(x)})
+lapply(ca_sp, function(x) {summary(x)})
 ```
 
-```{r  plot-ca-month, echo=TRUE, message=FALSE}
+```{r  plot-ca-species, echo=TRUE, message=FALSE}
 # Compute biplots without names
-lapply(cast_months, function(x) {plot(cca(x), scaling=2)})
+lapply(cast_sp, function(x) {plot(cca(x), scaling=2)})
 
 # Biplots with species names
-dianame_long_m <- lapply(cast_months, function(x) colnames(x))
+dianame_long_sp <- lapply(cast_sp, function(x) colnames(x))
 
-dianame_m <- lapply(cast_months, function(x) make.cepnames(names(x)))
-stems_m <- lapply(cast_months, colSums)
+dianame_sp <- lapply(cast_sp, function(x) make.cepnames(names(x)))
+stems_sp <- lapply(cast_sp, colSums)
 
-for (i in 1:length(dianame_m)) {
-  plot(ca_m[[i]], dis="sp", type="n") #red crosses = species, dots = sites
-  orditorp(ca_m[[i]], dis="sp", lab=dianame_m[[i]], priority=stems_m[[i]],
+for (i in 1:length(dianame_sp)) {
+  plot(ca_sp[[i]], dis="sp", type="n") #red crosses = species, dots = sites
+  orditorp(ca_sp[[i]], dis="sp", lab=dianame_sp[[i]], priority=stems_sp[[i]],
            pcol="red", pch="+")
 }
 ```
 It seems like there are not one or two main factors explaining the variance in diatom composition but many since the fraction of cumulative explained variation is also not very high when considering several axes.
+I.e.
+July: cum explained variance of 1.+2. axes:0.12000
+August: cum explained variance of 1.+2. axes: 0.09192
+September: cum explained variance of 1. + 2. axes: 0.11570
 
-#### Genus
+### Genus
 
-```{r  ca-month-ge, echo=TRUE, message=FALSE}
+```{r  ca-genus, echo=TRUE, message=FALSE}
 # conduct CA
-ca_20ge <-lapply(cast_m20ge, function(x) {cca(x)})
+ca_ge <-lapply(cast_ge, function(x) {cca(x)})
 
 # Compute summary of CA results to inspect proportion of variance explained by each axis.
-lapply(ca_20ge, function(x) {summary(x)})
-```
-
-The cumulated explained variance of the first two axes is above 20 % in all months which is a much higher value than when taking species for the CA. Therefore, it might make more sense to proceed analysis with genus data instead of with species data.
-I.e.: 
-July: 1.+2. CA: 22.1 % of cumulative explaned variance
-August: 1.+2. CA: 21.5 % of cumulative explaned variance
-September:  1.+2. CA: 26.2 % of cumulative explaned variance
-
-```{r  plot-ca-month-ge, echo=TRUE, message=FALSE}
-# Compute biplots without names
-lapply(cast_20ge, function(x) {plot(cca(x), scaling=2)})
-
-# Biplots with species names
-dianame_long_20ge <- lapply(cast_20ge, function(x) colnames(x))
-
-# dianame_m_ge <- lapply(cast_months_ge, function(x) make.cepnames(names(x)))
-stems_20ge <- lapply(cast_20ge, colSums)
-
-for (i in 1:length(dianame_long_20ge)) {
-  plot(ca_20ge[[i]], dis="sp", type="n") #red crosses = species, dots = sites
-  orditorp(ca_20ge[[i]], dis="sp", lab=dianame_long_20ge[[i]], priority=stems_20ge[[i]],
-           pcol="red", pch="+")
-}
-```
-
-#### Species - > 5% of samples
-
-```{r cast-month, echo=TRUE, message=FALSE}
-dia_aggr_month_5sp <- dia_sam_5sp %>% 
-  group_by(month, species, site_id) %>%
-  summarise(mean = mean(cover),
-            perc95 = quantile(cover, 0.95, na.rm = TRUE),
-            total = n()) %>%
-  arrange(species)
-
-# Store single years as seperate elements of a list
-dia_aggr_split_m <- split(dia_aggr_month, dia_aggr_month$month)
-
-cast_months <- lapply(dia_aggr_split_m, function(x) dcast(x, site_id ~ species, value.var="perc95", fill = 0))
-
-# Take the first column and store it as a rowname, afterwards, delete the first column.
-cast_months <- lapply(cast_months,
-                     function(x) { rownames(x) <- x[,1];
-                                   x[,1] <- NULL;
-                                   x })
-
-# Remove rows where the row sum is zero.
-cast_months <- lapply(cast_months,
-       function(x) { x[rowSums(x) > 0,] })
-
-# names(cast_months)
-# Remove the months March and November since there is not enough data.
-cast_months[["03"]] <- NULL
-cast_months[["04"]] <- NULL
-cast_months[["11"]] <- NULL
-```
-
-#### Genus
-```{r cast-month-ge-5, echo=TRUE, message=FALSE}
-dia_aggr_5ge <- dia_sam_5ge %>% 
-  group_by(month, genus, site_id) %>%
-  summarise(mean = mean(cover),
-            perc95 = quantile(cover, 0.95, na.rm = TRUE),
-            total = n()) %>%
-  arrange(genus)
-
-# Store single months as seperate elements of a list
-dia_aggr_split_5ge <- split(dia_aggr_5ge, dia_aggr_5ge$month)
-
-cast_5ge <- lapply(dia_aggr_split_5ge, function(x) dcast(x, site_id ~ genus, value.var="perc95", fill = 0))
-
-# Take the first column and store it as a rowname, afterwards, delete the first column.
-cast_5ge <- lapply(cast_5ge,
-                     function(x) { rownames(x) <- x[,1];
-                                   x[,1] <- NULL;
-                                   x })
-
-# Remove rows where the row sum is zero.
-cast_5ge <- lapply(cast_5ge,
-       function(x) { x[rowSums(x) > 0,] })
-```
-
-#### DCA per month
-
-##### Species
-
-```{r dca-month, echo=TRUE, message=FALSE}
-lapply(cast_months, function(x) {decorana(x)})
-lapply(cast_months, function(x) {plot(decorana(x), display="both")})
-```
-The legth of the first axis is > 3 S.D. in all months and therefore, a unimodal gradient can be assumed for all months.
-
-##### Genus
-```{r dca-month-ge-5, echo=TRUE, message=FALSE}
-lapply(cast_5ge, function(x) {decorana(x)})
-lapply(cast_5ge, function(x) {plot(decorana(x), display="both")})
-```
-
-Also for genus data, the length of the irst axis is > 3 S.D. in all months and therefore, a unimodal gradient can be assumed for all months.
-
-## CA
-
-### CA per month
-
-#### Species
-
-```{r  ca-month, echo=TRUE, message=FALSE}
-# conduct CA
-ca_m <-lapply(cast_months, function(x) {cca(x)})
-
-# Compute summary of CA results to inspect proportion of variance explained by each axis.
-lapply(ca_m, function(x) {summary(x)})
-```
-
-```{r  plot-ca-month, echo=TRUE, message=FALSE}
-# Compute biplots without names
-lapply(cast_months, function(x) {plot(cca(x), scaling=2)})
-
-# Biplots with species names
-dianame_long_m <- lapply(cast_months, function(x) colnames(x))
-
-dianame_m <- lapply(cast_months, function(x) make.cepnames(names(x)))
-stems_m <- lapply(cast_months, colSums)
-
-for (i in 1:length(dianame_m)) {
-  plot(ca_m[[i]], dis="sp", type="n") #red crosses = species, dots = sites
-  orditorp(ca_m[[i]], dis="sp", lab=dianame_m[[i]], priority=stems_m[[i]],
-           pcol="red", pch="+")
-}
-```
-It seems like there are not one or two main factors explaining the variance in diatom composition but many since the fraction of cumulative explained variation is also not very high when considering several axes.
-
-#### Genus
-
-```{r  ca-month-ge-5, echo=TRUE, message=FALSE}
-# conduct CA
-ca_5ge <-lapply(cast_5ge, function(x) {cca(x)})
-
-# Compute summary of CA results to inspect proportion of variance explained by each axis.
-lapply(ca_5ge, function(x) {summary(x)})
+lapply(ca_ge, function(x) {summary(x)})
 ```
 
 The cumulated explained variance of the first two axes is above 20 % in all months which is a much higher value than when taking species for the CA. Therefore, it might make more sense to proceed analysis with genus data instead of with species data.
@@ -773,28 +648,112 @@ July: 1.+2. CA: 19.9 % of cumulative explaned variance
 August: 1.+2. CA: 19.8 % of cumulative explaned variance
 September:  1.+2. CA: 23.5 % of cumulative explaned variance
 
-```{r  plot-ca-month-ge, echo=TRUE, message=FALSE}
+```{r  plot-ca-genus, echo=TRUE, message=FALSE}
 # Compute biplots without names
-lapply(cast_5ge, function(x) {plot(cca(x), scaling=2)})
+lapply(cast_ge, function(x) {plot(cca(x), scaling=2)})
 
 # Biplots with species names
-dianame_long_5ge <- lapply(cast_5ge, function(x) colnames(x))
+dianame_long_ge <- lapply(cast_ge, function(x) colnames(x))
 
 # dianame_m_ge <- lapply(cast_months_ge, function(x) make.cepnames(names(x)))
-stems_5ge <- lapply(cast_5ge, colSums)
+stems_ge <- lapply(cast_ge, colSums)
 
-for (i in 1:length(dianame_long_5ge)) {
-  plot(ca_5ge[[i]], dis="sp", type="n") #red crosses = species, dots = sites
-  orditorp(ca_5ge[[i]], dis="sp", lab=dianame_long_5ge[[i]], priority=stems_5ge[[i]],
+for (i in 1:length(dianame_long_ge)) {
+  plot(ca_ge[[i]], dis="sp", type="n") #red crosses = species, dots = sites
+  orditorp(ca_ge[[i]], dis="sp", lab=dianame_long_ge[[i]], priority=stems_ge[[i]],
            pcol="red", pch="+")
 }
+
+```
+
+Does not work yet
+```{r}
+# make plots
+ca_list_ge = list()
+for (i in 1:length(dianame_long_ge)) {
+ p = plot(ca_ge[[i]], dis="sp", type="n") 
+  orditorp(ca_ge[[i]], dis="sp", lab=dianame_long_ge[[i]], priority=stems_ge[[i]],
+           pcol="red", pch="+")
+  ca_list_ge[[i]] = p
+}
+
+# save plots
+for (i in 1:3) {
+  file_name = paste("ca_plot_ge_", i, ".png", sep="")
+  png(file_name)
+  print(ca_list_ge[[i]])
+  dev.off()
+}
+```
+
+## Environmental data
+
+# cast_ge_cca is the diatom data to use for this part.
+
+All physical-chemical data were deleted that were not taken at the same site and in the same month as a diatom sample.
+--> Nochmal neu berechnen wenn weitere Monate rausgeschmissen wurden.
+```{r join-phch, echo=TRUE, message=FALSE}
+phch_sam <- semi_join(phch_sam, dia_sam_cca, by =c("site_id","month")) 
+```
+
+### Keep only certain environmental variables
+
+```{r envi-variables, echo=TRUE, message=FALSE}
+phch_list = phch_sam %>%
+  filter(psm == FALSE) %>%
+  distinct(name) %>%
+  arrange(name)
+phch_list
+
+nrow(phch_sam[phch_sam$name=="Elektrische LeitfÃ¤higkeit (20Â°C)", ]) #2133
+nrow(phch_sam[phch_sam$name=="Elektrische LeitfÃ¤higkeit (25Â°C)", ]) #5034
+# More data available for conductivity at 25 degree
+
+# o-Phosphat-P,ortho-Phosphat
+nrow(phch_sam[phch_sam$name=="o-Phosphat-P", ]) #2391
+nrow(phch_sam[phch_sam$name=="ortho-Phosphat", ]) #2070 #PO4 3-
+# Is that the same just with a different name? Can I then combine them? if yes --> Just rename one variable to the other
+
+# Landwirtschaft (atkis_perc) --> Not found.
+
+phch_sam <- phch_sam %>%
+  filter(psm == 'TRUE' | name %in% c("Wassertemperatur", "pH-Wert (Feld)", "Elektrische LeitfÃ¤higkeit (25Â°C)", "SauerstoffsÃ¤ttigung", "gesamter organisch gebundener Kohlenstoff", "Gesamt-Stickstoff" , "o-Phosphat-P", "ortho-Phosphat" ))
+
+# Rename o-Phosphat-P cells
+# phch_sam$name[phch_sam1$name=="o-Phosphat-P"] <- "ortho-Phosphat"
+
+# Rename all names
+phch_sam$name[phch_sam$name=="Wassertemperatur"] <- "temperature"
+phch_sam$name[phch_sam$name=="pH-Wert (Feld)"] <- "pH"
+phch_sam$name[phch_sam$name=="Elektrische LeitfÃ¤higkeit (25Â°C)"] <- "conductivity"
+phch_sam$name[phch_sam$name=="SauerstoffsÃ¤ttigung"] <- "oxygen saturation"
+phch_sam$name[phch_sam$name=="gesamter organisch gebundener Kohlenstoff"] <- "TOC"
+phch_sam$name[phch_sam$name=="Gesamt-Stickstoff"] <- "tot-N"
+```
+
+    - Landwirtschaft (atkis_perc)
+    - Temperature +
+    - pH +
+    - maxTU/Monat (2 wichtigsten Monate)
+    - conductivity +
+    - Sauerstoffgehalt +
+    - tot-P
+    - tot-N +
+    - TOC +
+
+
+
+### calculate TU from EC50
+```{r Tcalculate-TU, echo=TRUE, message=FALSE}
+# TU = log10(concentration of compound / EC50)
+# sumTU + maxTU
+
+
 
 
 ```
 
 
-
-## Environmental data
 
 ```{r select-envi-variables, echo=TRUE, message=FALSE}
 herb_list = phch_sam %>%
@@ -919,21 +878,4 @@ cor(envi_cast, use = "complete.obs")
 sort(vif(envi_cast))
 
 ```
-
-
-```{r load-ec50-data, echo=TRUE, message=FALSE}
-drv = dbDriver("PostgreSQL")
-con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
-
-
-ec50 = dbGetQuery(con, "SELECT variable_id, subst_name, n_al_f, ec50f_al_min, ec50f_al_min_taxa, ec50f_al_perc5, ec50f_al_mean
-                                FROM phch.phch_ec50
-                               ")
-
-dbDisconnect(con)
-dbUnloadDriver(drv)
-```
-
-Data is very inclomplete.
-##AS: We don't need data for every single algae. We can aggregate all Freshwater algae.
 
