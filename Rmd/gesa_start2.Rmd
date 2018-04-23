@@ -202,7 +202,26 @@ ec50 = dbGetQuery(con, "SELECT casnr, subst_name, ec50f_al4896_fin
 }
 ```
 
-Join physica-chemical data with EC50 data.
+### Load landuse data
+
+```{r load-landuse-data, echo=TRUE, message=FALSE}
+if (online) {
+  drv = dbDriver("PostgreSQL")
+  con = dbConnect(drv, dbname = DBname, user = DBuser, host = DBhost, port = DBport, password = DBpassword)
+
+landuse = dbGetQuery(con, "SELECT site_id, atkis_perc
+                                FROM spatial_derived.land_use_ezg30
+                  ")
+  dbDisconnect(con)
+  dbUnloadDriver(drv)
+  
+  saveRDS(landuse, file.path('cache', 'landuse.rds'))
+} else {
+  landuse = readRDS(file.path('cache', 'landuse.rds'))
+}
+```
+
+Join physical-chemical data with EC50 data.
 ```{r join-ec50}
 # Join phch with ec50 to include casnr
 phch_sam = left_join(phch_sam, ec50, by = "casnr")
@@ -214,7 +233,6 @@ phch_sam = phch_sam %>%
   filter(!ec50f_al4896_fin=="" | psm == FALSE)
 
 ```
-
 
 ## Data preparation
 
@@ -376,10 +394,10 @@ In 2015, almost no herbicide samples were taken. Also, the year 2014 was not so 
 
 ```{r remove-months}
 dia_sam = dia_sam %>%
-  filter(month %in% c("07", "08", "09"))
+  filter(month %in% c("07",  "09"))
 
 dia_sam_cca = dia_sam_cca %>%
-  filter(month %in% c("07", "08", "09"))
+  filter(month %in% c("07", "09"))
   
 ```
 
@@ -693,8 +711,20 @@ for (i in 1:3) {
 All physical-chemical data were deleted that were not taken at the same site and in the same month as a diatom sample.
 --> Nochmal neu berechnen wenn weitere Monate rausgeschmissen wurden.
 ```{r join-phch, echo=TRUE, message=FALSE}
+nrow(phch_sam) # 1234777
 phch_sam <- semi_join(phch_sam, dia_sam_cca, by =c("site_id","month")) 
+nrow(phch_sam) # 21695
 ```
+
+### Convert `column atkis_perc` to element of column `name` and `value`.
+
+```{r}
+#value = atkis_perc
+#name = "atkis_perc"
+# add_row(.data, ..., .before = NULL, .after = NULL)
+
+```
+
 
 ### Keep only certain environmental variables
 
@@ -714,8 +744,6 @@ nrow(phch_sam[phch_sam$name=="o-Phosphat-P", ]) #2391
 nrow(phch_sam[phch_sam$name=="ortho-Phosphat", ]) #2070 #PO4 3-
 # Is that the same just with a different name? Can I then combine them? if yes --> Just rename one variable to the other
 
-# Landwirtschaft (atkis_perc) --> Not found.
-
 phch_sam <- phch_sam %>%
   filter(psm == 'TRUE' | name %in% c("Wassertemperatur", "pH-Wert (Feld)", "Elektrische LeitfÃ¤higkeit (25Â°C)", "SauerstoffsÃ¤ttigung", "gesamter organisch gebundener Kohlenstoff", "Gesamt-Stickstoff" , "o-Phosphat-P", "ortho-Phosphat" ))
 
@@ -729,9 +757,11 @@ phch_sam$name[phch_sam$name=="Elektrische LeitfÃ¤higkeit (25Â°C)"] <- "condu
 phch_sam$name[phch_sam$name=="SauerstoffsÃ¤ttigung"] <- "oxygen saturation"
 phch_sam$name[phch_sam$name=="gesamter organisch gebundener Kohlenstoff"] <- "TOC"
 phch_sam$name[phch_sam$name=="Gesamt-Stickstoff"] <- "tot-N"
+
+nrow(phch_sam) # 10996
 ```
 
-    - Landwirtschaft (atkis_perc)
+    - Landwirtschaft (atkis_perc) + not as name and unit yet but as seperate column
     - Temperature +
     - pH +
     - maxTU/Monat (2 wichtigsten Monate)
@@ -748,9 +778,95 @@ phch_sam$name[phch_sam$name=="Gesamt-Stickstoff"] <- "tot-N"
 # TU = log10(concentration of compound / EC50)
 # sumTU + maxTU
 
+# Dataset with only psm data
+phch_sam_y = phch_sam %>%
+  filter(psm == TRUE) %>%
+  mutate(TU = log10(value_fin) / ec50f_al4896_fin)
+nrow(phch_sam_y) # 7958
+
+# remove infinite values
+phch_sam_y = phch_sam_y %>%
+  filter(!is.infinite(TU))
+
+# calculate sumTU, maxTU
+phch_sam_y_TU = phch_sam_y %>%
+  group_by(sample_id, site_id, date) %>%
+  summarise(sumTU = sum(TU), maxTU = max(TU), total = n())
+# Good dataset of sumTU and maxTU
+# --> Needs to be included in phch_sam as variable in name and value column
+
+#phch_sam_y_TU <- phch_sam_y_TU[ ,phch_sam_y_TU$name]
+# column name must be sumTU and maxTU respectively
+# column sumTU and max TU must be converted to value_fin
+# then:
+# phch_sam_bin <- bind_rows(phch_sam, phch_sam_y_TU)
+phch_sam_y_maxTU <- phch_sam_y_TU[,-4]
+phch_sam_y_sumTU <- phch_sam_y_TU[,-5]
+phch_TU_bind <- bind_rows(phch_sam_y_maxTU, phch_sam_y_sumTU)
+
+# create column name
+phch_TU_bind <- phch_TU_bind %>%
+  mutate(name = if_else(is.na(maxTU), "sumTU", "maxTU")) %>%
+  mutate(value_fin = if_else(is.na(maxTU), sumTU, maxTU))
+
+# Remove columns sumTU and maxTU and total
+phch_TU_bind <- phch_TU_bind %>%
+  select(-c(sumTU, maxTU, total))
+
+# Bind table with phch_sam table
+phch_sam <- bind_rows(phch_sam, phch_TU_bind)
+
+# Remove single herbicides
+phch_sam = phch_sam %>%
+  filter(! psm == TRUE)
+
+# Year, month and day column need to be renewed since they do not exist for sumTU and maxTU
+phch_sam$year <- format(phch_sam$date, '%Y')  # Create column for year
+phch_sam$month <- format(phch_sam$date, '%m') # Create column for month
+phch_sam$day <- format(phch_sam$date, '%j')   # Create column for day of the year
+
+# -----------------------------------------------------------------------------------
+# Just trying out stuff:
+
+# and only TU > -inf
+#phch_sam_y_e09 = phch_sam_y %>%
+#  filter(TU > -1.0e+09)
+# --> no -inf values left. But did I delete too many values with this approach?
+#nrow(phch_sam_y_e09) #229
+
+# How many -inf values are in the TU column?
+#sum(is.infinite(phch_sam_y$TU)) # 7729
+#length(phch_sam_y$TU)           # 7958
+#length(phch_sam_y$TU) - sum(is.infinite(phch_sam_y$TU)) # 229
+
+# convert infinite values to NAs
+#dt <- data.table(phch_sam_y)
+#invisible(lapply(names(dt),function(.name) set(dt, which(is.infinite(dt[[.name]])), j = .name,value =NA)))
+
+# convert back  to data frame
+#dt <- as.data.frame(dt)
+
+# remove all NAs in column TU
+#dt = dt %>%
+#  filter(!is.na(TU))
 
 
+```
 
+```{r landuse-to-name-column}
+# change column "atkis_perc" to "value_fin"
+names(landuse) [names(landuse) =="atkis_perc"] <- "value_fin"
+
+# create column "name" with the entry "agriculture" in all columns
+landuse$name <- "agriculture"
+
+# Bind landuse table to phch_sam
+phch_sam <- bind_rows(phch_sam, landuse)
+
+# List of all environmental variables
+phch_sam %>%
+  distinct(name) %>%
+  arrange(name)
 ```
 
 
