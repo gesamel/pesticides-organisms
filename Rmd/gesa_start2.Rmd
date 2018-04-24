@@ -98,7 +98,7 @@ if (online) {
                          FROM dia.dia_samples
                          WHERE date > '2004-12-31'
                          ")
-  dbDisconnect(con) ##AS: close beore doing the belwo changes
+  dbDisconnect(con) 
   dbUnloadDriver(drv)
   
   saveRDS(dia_sites_geo, file.path('cache', 'dia_sites_geo.rds'))
@@ -223,16 +223,20 @@ landuse = dbGetQuery(con, "SELECT site_id, atkis_perc
 
 Join physical-chemical data with EC50 data.
 ```{r join-ec50}
+nrow(phch_sam)
 # Join phch with ec50 to include casnr
 phch_sam = left_join(phch_sam, ec50, by = "casnr")
 
 # Remove all rows that are pesticides but don't have a ec50f_al4896_fin  entry
-# Keep all rows that have a EC50 valueor that are no pesticides.
+# Keep all rows that have a EC50 value or that are no pesticides.
 
 phch_sam = phch_sam %>%
   filter(!ec50f_al4896_fin=="" | psm == FALSE)
 
+nrow(phch_sam) #5113250
+
 ```
+
 
 ## Data preparation
 
@@ -241,8 +245,8 @@ For the CCA later on, a dataset was created containing only diatom samples where
 ```{r join-on-site-year, echo=TRUE, message=FALSE}
 # Diatom data
 
-dia_sam_cca <- semi_join(dia_sam, phch_sam[phch_sam$psm==TRUE,], by = c("site_id", "month"))
-nrow(dia_sam_cca)
+dia_sam_cca <- semi_join(dia_sam, phch_sam[phch_sam$psm==TRUE & !phch_sam$value_fin == 0,], by = c("site_id", "month"))
+nrow(dia_sam_cca) # 37415
 
 ##AS: like this you can keep it an sf-object:
 ##AS: generally you can handle sf-Objects with dplyr like data.frames and tibbles
@@ -402,7 +406,7 @@ dia_sam_cca = dia_sam_cca %>%
 ```
 
 ## Taxon frequency
-[@Marchant.2002] suggests to remove rare species as only common species produce information that can reliably be linked to present environmental gradients. [@Cao.2001] suggests the removal of rare species if samples were taken over a large spatial scale which holds true for the present dataset. Furthermore, Chi-square distance, which is the distance measure used in CA and CCA, gives more weight to rare species. Due to this reason, [@Legendre.2012] suggest to remove rare species from the analysis. Here, 4 datasets are created: Species and genera that occur at less than 20 % of the sites were removed, respectively and species and genera that occur in less than 5 % of the samples were removed, respectively.
+[@Marchant.2002] suggests to remove rare species as only common species produce information that can reliably be linked to present environmental gradients. [@Cao.2001] suggests the removal of rare species if samples were taken over a large spatial scale which holds true for the present dataset. Furthermore, Chi-square distance, which is the distance measure used in CA and CCA, gives more weight to rare species. Due to this reason, (@Legendre.2012) suggest to remove rare species from the analysis. Here, 4 datasets are created: Species and genera that occur at less than 20 % of the sites were removed, respectively and species and genera that occur in less than 5 % of the samples were removed, respectively (@Fernandez.2016).
 
 The analysis was done for both, species and genus data and therefore, all procedures were performed for species data and genus data seperately from here on. According to (@Rimet.2012), analysis with a taxonomic resolution of genus performs as well as a resolution of species level in many cases. Similarly, (@Larras.2014) found that diatom sensitivity to herbicides can be attributed to their phylogeny. They reported that centric and araphid diatoms (Thalassiosirales and Fragilariales, respectively
 ) were most sensitive to the herbicides whereas pennates (Cymbellales, Naviculales and Bacillariales)
@@ -706,25 +710,16 @@ for (i in 1:3) {
 
 ## Environmental data
 
-# cast_ge_cca is the diatom data to use for this part.
+`cast_ge_cca`is the diatom data to use for this part.
 
 All physical-chemical data were deleted that were not taken at the same site and in the same month as a diatom sample.
 --> Nochmal neu berechnen wenn weitere Monate rausgeschmissen wurden.
 ```{r join-phch, echo=TRUE, message=FALSE}
-nrow(phch_sam) # 1234777
+nrow(phch_sam) # 1234777   # 5113250 !
 phch_sam <- semi_join(phch_sam, dia_sam_cca, by =c("site_id","month")) 
-nrow(phch_sam) # 21695
-```
-
-### Convert `column atkis_perc` to element of column `name` and `value`.
-
-```{r}
-#value = atkis_perc
-#name = "atkis_perc"
-# add_row(.data, ..., .before = NULL, .after = NULL)
+nrow(phch_sam) # 21695    # 72066 !
 
 ```
-
 
 ### Keep only certain environmental variables
 
@@ -733,15 +728,15 @@ phch_list = phch_sam %>%
   filter(psm == FALSE) %>%
   distinct(name) %>%
   arrange(name)
-phch_list
+phch_list #list of all environmental variables that are not herbicides
 
-nrow(phch_sam[phch_sam$name=="Elektrische LeitfÃ¤higkeit (20Â°C)", ]) #2133
-nrow(phch_sam[phch_sam$name=="Elektrische LeitfÃ¤higkeit (25Â°C)", ]) #5034
+nrow(phch_sam[phch_sam$name=="Elektrische LeitfÃ¤higkeit (20Â°C)", ]) #2133  # 885
+nrow(phch_sam[phch_sam$name=="Elektrische LeitfÃ¤higkeit (25Â°C)", ]) #5034  # 1916
 # More data available for conductivity at 25 degree
 
 # o-Phosphat-P,ortho-Phosphat
-nrow(phch_sam[phch_sam$name=="o-Phosphat-P", ]) #2391
-nrow(phch_sam[phch_sam$name=="ortho-Phosphat", ]) #2070 #PO4 3-
+nrow(phch_sam[phch_sam$name=="o-Phosphat-P", ]) #2391  # 1018
+nrow(phch_sam[phch_sam$name=="ortho-Phosphat", ]) #2070 #PO4 3-  # 891
 # Is that the same just with a different name? Can I then combine them? if yes --> Just rename one variable to the other
 
 phch_sam <- phch_sam %>%
@@ -754,12 +749,17 @@ phch_sam <- phch_sam %>%
 phch_sam$name[phch_sam$name=="Wassertemperatur"] <- "temperature"
 phch_sam$name[phch_sam$name=="pH-Wert (Feld)"] <- "pH"
 phch_sam$name[phch_sam$name=="Elektrische LeitfÃ¤higkeit (25Â°C)"] <- "conductivity"
-phch_sam$name[phch_sam$name=="SauerstoffsÃ¤ttigung"] <- "oxygen saturation"
+phch_sam$name[phch_sam$name=="SauerstoffsÃ¤ttigung"] <- "oxygen"
 phch_sam$name[phch_sam$name=="gesamter organisch gebundener Kohlenstoff"] <- "TOC"
-phch_sam$name[phch_sam$name=="Gesamt-Stickstoff"] <- "tot-N"
+phch_sam$name[phch_sam$name=="Gesamt-Stickstoff"] <- "tot_N"
+phch_sam$name[phch_sam$name=="o-Phosphat-P"] <- "o_phosphat_p"
+phch_sam$name[phch_sam$name=="ortho-Phosphat"] <- "ortho_phosphat"
 
-nrow(phch_sam) # 10996
+nrow(phch_sam) # 10996  # 51429 if herbicides remain in dataset. Keep them!!  
+# 36449 !  --> In the beginning, all diatom samples were deleted that were not measured at any site where psm were taken and value_fin was == 0. This results in less phch samples that were taken at a diatom sampling site. This was recalculated and therefore, the numbers have changed.
+nrow(phch_sam[phch_sam$psm==TRUE,])  # 26408 datapoints are from herbicide data
 ```
+Which data to use for tot-P??
 
     - Landwirtschaft (atkis_perc) + not as name and unit yet but as seperate column
     - Temperature +
@@ -774,19 +774,24 @@ nrow(phch_sam) # 10996
 
 
 ### calculate TU from EC50
+TU = log10(concentration of compound / EC50)
+Calculate the sumTU and the maxTU per site and date.
 ```{r Tcalculate-TU, echo=TRUE, message=FALSE}
-# TU = log10(concentration of compound / EC50)
-# sumTU + maxTU
-
 # Dataset with only psm data
 phch_sam_y = phch_sam %>%
   filter(psm == TRUE) %>%
   mutate(TU = log10(value_fin) / ec50f_al4896_fin)
-nrow(phch_sam_y) # 7958
+nrow(phch_sam_y) # 7958   # 26408
+
+nrow(phch_sam_y[phch_sam_y$value_fin=="0", ])
+# 24023
+# Many pesticides have concentration of zero.
+# The TU of theses measurements is therefore -infinity and has to be removed.
 
 # remove infinite values
 phch_sam_y = phch_sam_y %>%
-  filter(!is.infinite(TU))
+  filter(!is.infinite(TU)) 
+nrow(phch_sam_y)  # 24.4.: 2385 rows remain
 
 # calculate sumTU, maxTU
 phch_sam_y_TU = phch_sam_y %>%
@@ -794,6 +799,7 @@ phch_sam_y_TU = phch_sam_y %>%
   summarise(sumTU = sum(TU), maxTU = max(TU), total = n())
 # Good dataset of sumTU and maxTU
 # --> Needs to be included in phch_sam as variable in name and value column
+nrow(phch_sam_y_TU) # 622
 
 #phch_sam_y_TU <- phch_sam_y_TU[ ,phch_sam_y_TU$name]
 # column name must be sumTU and maxTU respectively
@@ -804,160 +810,151 @@ phch_sam_y_maxTU <- phch_sam_y_TU[,-4]
 phch_sam_y_sumTU <- phch_sam_y_TU[,-5]
 phch_TU_bind <- bind_rows(phch_sam_y_maxTU, phch_sam_y_sumTU)
 
-# create column name
-phch_TU_bind <- phch_TU_bind %>%
-  mutate(name = if_else(is.na(maxTU), "sumTU", "maxTU")) %>%
-  mutate(value_fin = if_else(is.na(maxTU), sumTU, maxTU))
-
+# create new columns "name" and "value_fin"
 # Remove columns sumTU and maxTU and total
 phch_TU_bind <- phch_TU_bind %>%
+  mutate(name = if_else(is.na(maxTU), "sumTU", "maxTU")) %>%
+  mutate(value_fin = if_else(is.na(maxTU), sumTU, maxTU)) %>%
   select(-c(sumTU, maxTU, total))
 
 # Bind table with phch_sam table
 phch_sam <- bind_rows(phch_sam, phch_TU_bind)
+# does not wkr properly?
 
 # Remove single herbicides
-phch_sam = phch_sam %>%
-  filter(! psm == TRUE)
+phch_sam <- phch_sam[!phch_sam$psm==TRUE, ]
+
+#phch_sam2 = phch_sam %>%
+#  filter(! psm == TRUE)
+# does not work properly. WHY? Only removes new variables maxTU and sumTU
+
 
 # Year, month and day column need to be renewed since they do not exist for sumTU and maxTU
 phch_sam$year <- format(phch_sam$date, '%Y')  # Create column for year
 phch_sam$month <- format(phch_sam$date, '%m') # Create column for month
 phch_sam$day <- format(phch_sam$date, '%j')   # Create column for day of the year
 
-# -----------------------------------------------------------------------------------
-# Just trying out stuff:
-
-# and only TU > -inf
-#phch_sam_y_e09 = phch_sam_y %>%
-#  filter(TU > -1.0e+09)
-# --> no -inf values left. But did I delete too many values with this approach?
-#nrow(phch_sam_y_e09) #229
-
-# How many -inf values are in the TU column?
-#sum(is.infinite(phch_sam_y$TU)) # 7729
-#length(phch_sam_y$TU)           # 7958
-#length(phch_sam_y$TU) - sum(is.infinite(phch_sam_y$TU)) # 229
-
-# convert infinite values to NAs
-#dt <- data.table(phch_sam_y)
-#invisible(lapply(names(dt),function(.name) set(dt, which(is.infinite(dt[[.name]])), j = .name,value =NA)))
-
-# convert back  to data frame
-#dt <- as.data.frame(dt)
-
-# remove all NAs in column TU
-#dt = dt %>%
-#  filter(!is.na(TU))
-
-
+nrow(phch_sam)  # 12689
 ```
 
+Agricultural data.
 ```{r landuse-to-name-column}
+# Join landuse data with diatom dataset . Remove all landuse sites where diatoms haven't been sampled.
+nrow(landuse) #1302
+landuse = semi_join(landuse, dia_sam_cca, by = "site_id")
+nrow(landuse) # 59
+
 # change column "atkis_perc" to "value_fin"
 names(landuse) [names(landuse) =="atkis_perc"] <- "value_fin"
 
 # create column "name" with the entry "agriculture" in all columns
 landuse$name <- "agriculture"
 
+# create column "month" with the entry "07" in all columns
+landuse$month <- "07"
+
+# make copy of landuse dataset
+landuse_09 <- landuse
+
+# change month from 07 to 09
+landuse_09$month <- "09"
+
+# Bind landuse and landuse_09
+landuse <- bind_rows(landuse, landuse_09)
+nrow(landuse) # 118
+
 # Bind landuse table to phch_sam
 phch_sam <- bind_rows(phch_sam, landuse)
 
 # List of all environmental variables
-phch_sam %>%
+phch_list <- phch_sam %>%
   distinct(name) %>%
   arrange(name)
+phch_list
+
+nrow(phch_sam)  # 11483   # 12807 name = NA?? where do these rows come from?
+
+# nrow(phch_sam[phch_sam$name=="agriculture" ,] )
+#phch_sam <- phch_sam[!phch_sam$name=="agriculture" ,] 
+```
+
+Join phch_sam on dia_sam_cca by site_id to exclude all samples that were not taken at a diatom sampling site.
+
+Also join dia_sam_cca on phch_sam by site_id to exclude all diatom samples were no phys-chem parameters were taken. --> does not need to be performed
+```{r}
+nrow(phch_sam) # 11483
+phch_sam <- semi_join(phch_sam, dia_sam_cca, by =c("site_id","month"))
+nrow(phch_sam) # 11425
+
+nrow(dia_sam_cca) # 13437
+length(unique(dia_sam_cca$site_id)) #228
+length(unique(phch_sam$site_id))    #228
+
+####### these steps dont have to be performed ########
+dia_sam_cca1 <- semi_join(dia_sam_cca, phch_sam[phch_sam$name=="maxTU" | phch_sam$name=="sumTU" ,], by = c("site_id", "month"))
+nrow(dia_sam_cca1)  # 13437  
+# no dia_sam_cca samples have to be excluded because they were not sampled at a site where herbicides were measured
+
+dia_sam_cca2 <- semi_join(dia_sam_cca, phch_sam, by = c("site_id", "month"))
+nrow(dia_sam_cca2) # 13437
+# at all diatom sampling sites, some phch_samples were taken
 ```
 
 
-
-```{r select-envi-variables, echo=TRUE, message=FALSE}
-herb_list = phch_sam %>%
-  filter(psm_type == 'herbicide') %>%
-  distinct(name) %>%
-  arrange(name)
-
-nrow(herb_list)
-
-phch <- phch_sam %>%
-  filter(psm == 'TRUE' | name %in% c("Nitit", "Nitrat-Stickstoff", "Kalium", "Chlorid", "Nitrat", "Gesamt-Phosphor", "Sauerstoffgehalt", "Gesamt-Stickstoff", "Stickstoff", "pH-Wert (Feld)", "Ammonium-Stickstoff", "BSB5", "Nitrit-Stickstoff", "Natrium", "Sulfat", "Ammonium", "Abfluss", "Stickstoff", "Hydrogenkarbonat", "Eisen", "Wassertemperatur", "Magnesium", "Phosphor", "Chemischer Sauerstoffgehalt"))
-
-# 6,768,652 observations
-phch_sam <- phch_sam[! phch_sam$value_fin =="0",]   # if value is zero, then limit of quantification was not reached
-nrow(phch_sam)
-# 481,178 observations
-
-# Change order of columns
-#envi = envi[ ,c(1:2,7, 3:6)]
-
-##########################################
-# Convert water temperature from celsius to kelvin
-#envi <- envi %>%
-#  ifelse(name %in% "Wassertemperatur", value_fin + 273.15, value_fin)
-
-#envi_K <- envi %>%
-#  filter(grep("Wassertemperatur", name)) %>%
-#  mutate(value_fin2 = value_fin + 273.15)
-
-#envi_K <- envi %>%
-#  mutate(value_fin2 = ifelse(grepl("Wassertemperatur", name), value_fin + 273.15, #ifelse(grepl(!"Wassertemperatur", name), value_fin)))
-
-# none of these work yet..
-
+How many negative values are in value_fin? Can CCA handle negative values?
+```{r}
+nrow(phch_sam[phch_sam$value_fin<0 ,]) # 1310
+phch_sam[phch_sam$value_fin<0 ,] # Many maxTU (and sumTU?) values are below zero.
 ```
 
-Aggregate data over all years and within years. Then, transform data from long to wide format.
-```{r  transformation-95th-envi, echo=TRUE, message=FALSE}
 
-# Aggreagate over all years
-# setDF(dia_cov)
-envi_aggr <- envi %>%
-  group_by(name, site_id) %>%
+Aggregate environmental data over all years for July and September. Then, transform form long to wide format.
+```{r cast-envi, echo=TRUE, message=FALSE}
+phch_sam_aggr <- phch_sam %>% 
+  group_by(month, name, site_id) %>%
   summarise(mean = mean(value_fin),
             perc95 = quantile(value_fin, 0.95, na.rm = TRUE),
             total = n()) %>%
   arrange(name)
 
-# Transform data into wide format
-envi_cast <- dcast(envi_aggr, site_id ~ name, value.var ="perc95", fill=0)
+# Store single months as seperate elements of a list
+phch_sam_list <- split(phch_sam_aggr, phch_sam_aggr$month)
 
-# Make site_id column into rowname
-rownames(envi_cast) <- (envi_cast[,1])
-envi_cast <- envi_cast[,-1]
+cast_envi <- lapply(phch_sam_list, function(x) dcast(x, site_id ~ name, value.var="perc95", fill = 0))
 
-# aggregate for all years seperately
-envi_aggr_year <- envi %>%
-  group_by(year, name, site_id) %>%
-  summarise(mean = mean(value_fin),
-            perc95 = quantile(value_fin, 0.95, na.rm = TRUE),
-            total = n()) %>%
-  arrange(name)
+# Take the first column and store it as a rowname, afterwards, delete the first column.
+cast_envi  <- lapply(cast_envi ,
+                     function(x) { rownames(x) <- x[,1];
+                                   x[,1] <- NULL;
+                                   x })
 
-# Store single years as seperate elements of a list
-envi_aggr_split <- split(envi_aggr_year, envi_aggr_year$year)
-envi_aggr_split[["2005"]] # check out structure
+# Remove rows where the row sum is zero.
+cast_envi  <- lapply(cast_envi ,
+       function(x) { x[rowSums(x) != 0,] })
 
-# Transform data from long to wide format
-envi_cast_years <- lapply(envi_aggr_split, function(x) dcast(x, site_id ~ name, value.var="perc95", fill = 0))
-names(envi_cast_years)
-envi_cast_years[["2014"]] # checkt out structure
-
-# Change rownames using the first column
-rownames(envi_cast_years[["2005"]]) <- (envi_cast_years[["2005"]][,1])
-rownames(envi_cast_years[["2006"]]) <- (envi_cast_years[["2006"]][,1])
-rownames(envi_cast_years[["2007"]]) <- (envi_cast_years[["2007"]][,1])
-rownames(envi_cast_years[["2008"]]) <- (envi_cast_years[["2008"]][,1])
-rownames(envi_cast_years[["2009"]]) <- (envi_cast_years[["2009"]][,1])
-rownames(envi_cast_years[["2010"]]) <- (envi_cast_years[["2010"]][,1])
-rownames(envi_cast_years[["2011"]]) <- (envi_cast_years[["2011"]][,1])
-rownames(envi_cast_years[["2012"]]) <- (envi_cast_years[["2012"]][,1])
-rownames(envi_cast_years[["2013"]]) <- (envi_cast_years[["2013"]][,1])
-rownames(envi_cast_years[["2014"]]) <- (envi_cast_years[["2014"]][,1])
-rownames(envi_cast_years[["2015"]]) <- (envi_cast_years[["2015"]][,1])
-
-# Delete column "site_id" of each row object
-envi_cast_years <- lapply(envi_cast_years, function(x) {x["site_id"] <- NULL;x})
 ```
+
+
+Try out CCA
+```{r cca}
+
+names(cast_envi[["07"]])
+
+dia_cca_07 <- cca(cast_ge_cca[["07"]] ~ agriculture + conductivity + maxTU + o_phosphat_p + ortho_phosphat + oxygen + pH + sumTU + temperature + TOC + tot_N, cast_envi[["07"]])
+
+dia_cca_07
+plot(dia_cca_07)
+
+#dia_cca <-lapply(cast_ge_cca, function(x) {cca(cast_ge_cca ~ agriculture + conductivity + o-Phosphat-P + #ortho-Phosphat + pH + temperature + tot-N, cast_envi)})
+dia_cca_09 <- cca(cast_ge_cca[["09"]] ~ agriculture + conductivity + maxTU + o_phosphat_p + ortho_phosphat + oxygen + pH + sumTU + temperature + TOC + tot_N, cast_envi[["09"]])
+
+dia_cca_09
+plot(dia_cca_09)
+
+#the arrow points to the direction
+#of the gradient, and its length indicates the strength of the variable
+```
+
 
 # Check for collinearity. First, over the years 2005-2012 (years for which enough diatom data is available). Then, check all years seperately.
 ```{r collinearity-check, echo=TRUE, message=FALSE}
