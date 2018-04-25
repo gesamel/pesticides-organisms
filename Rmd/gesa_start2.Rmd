@@ -223,7 +223,7 @@ landuse = dbGetQuery(con, "SELECT site_id, atkis_perc
 
 Join physical-chemical data with EC50 data.
 ```{r join-ec50}
-nrow(phch_sam)
+nrow(phch_sam) # 5268995
 # Join phch with ec50 to include casnr
 phch_sam = left_join(phch_sam, ec50, by = "casnr")
 
@@ -435,6 +435,7 @@ dia_sam_N_ge = dia_sam_ge %>%
        group_by(genus) %>%
        summarise(N=n())
 plot(density(dia_sam_N_ge$N), main="Genus density")
+# Histogram
 
 ## Rare species
 dia_sam_sp = dia_sam %>%
@@ -478,6 +479,23 @@ plot(density(dia_sam_N_ge_cca$N), main="Genus density")
 
 
 ```
+
+```{r explore diatom-data}
+# min and max values of cover
+range(dia_sam_ge$cover)
+# count cases for each cover class
+cov <- table(unlist(dia_sam_ge$cover))
+# barplot of the cover distribution
+barplot(cov, las=1, xlab ="cover class", ylab="frequency")
+# Number of zero cover
+sum(dia_sam_ge$cover==0)
+
+# Species occurences: Numver of sampling dates where each species is present
+
+
+#--> continue with numerical ecology with R
+```
+
 
 ## Transform data to get from long to wide data
 
@@ -588,6 +606,13 @@ cast_ge_cca <- lapply(cast_ge_cca,
 # Remove rows where the row sum is zero.
 cast_ge_cca <- lapply(cast_ge_cca,
        function(x) { x[rowSums(x) > 0,] })
+```
+
+```{r save-final-psm-datasets}
+
+#saveRDS(cast_ge_cca, file.path('cache', 'dia_ge_final.rds'))
+cast_ge_cca <- readRDS(file.path('cache', 'dia_ge_final.rds'))
+                         
 ```
 
 ### DCA
@@ -772,7 +797,6 @@ Which data to use for tot-P??
     - TOC +
 
 
-
 ### calculate TU from EC50
 TU = log10(concentration of compound / EC50)
 Calculate the sumTU and the maxTU per site and date.
@@ -817,12 +841,13 @@ phch_TU_bind <- phch_TU_bind %>%
   mutate(value_fin = if_else(is.na(maxTU), sumTU, maxTU)) %>%
   select(-c(sumTU, maxTU, total))
 
-# Bind table with phch_sam table
-phch_sam <- bind_rows(phch_sam, phch_TU_bind)
-# does not wkr properly?
-
 # Remove single herbicides
 phch_sam <- phch_sam[!phch_sam$psm==TRUE, ]
+
+# Bind table with phch_sam table
+# does not always work properly..
+phch_sam <- bind_rows(phch_sam, phch_TU_bind)
+
 
 #phch_sam2 = phch_sam %>%
 #  filter(! psm == TRUE)
@@ -834,14 +859,16 @@ phch_sam$year <- format(phch_sam$date, '%Y')  # Create column for year
 phch_sam$month <- format(phch_sam$date, '%m') # Create column for month
 phch_sam$day <- format(phch_sam$date, '%j')   # Create column for day of the year
 
-nrow(phch_sam)  # 12689
+nrow(phch_sam)  
+unique(phch_sam$name)  #nrow=11365, maxTU, sumTU present. 
+# seems to work now
 ```
 
 Agricultural data.
 ```{r landuse-to-name-column}
 # Join landuse data with diatom dataset . Remove all landuse sites where diatoms haven't been sampled.
 nrow(landuse) #1302
-landuse = semi_join(landuse, dia_sam_cca, by = "site_id")
+landuse = semi_join(landuse, dia_sam_cca, by = "site_id") # does not need to be joined by month since landuse is independent of date
 nrow(landuse) # 59
 
 # change column "atkis_perc" to "value_fin"
@@ -872,7 +899,7 @@ phch_list <- phch_sam %>%
   arrange(name)
 phch_list
 
-nrow(phch_sam)  # 11483   # 12807 name = NA?? where do these rows come from?
+nrow(phch_sam)  # 11483
 
 # nrow(phch_sam[phch_sam$name=="agriculture" ,] )
 #phch_sam <- phch_sam[!phch_sam$name=="agriculture" ,] 
@@ -885,6 +912,7 @@ Also join dia_sam_cca on phch_sam by site_id to exclude all diatom samples were 
 nrow(phch_sam) # 11483
 phch_sam <- semi_join(phch_sam, dia_sam_cca, by =c("site_id","month"))
 nrow(phch_sam) # 11425
+# normally, this step should not have to be needed. Where does the gap come from?
 
 nrow(dia_sam_cca) # 13437
 length(unique(dia_sam_cca$site_id)) #228
@@ -905,6 +933,7 @@ How many negative values are in value_fin? Can CCA handle negative values?
 ```{r}
 nrow(phch_sam[phch_sam$value_fin<0 ,]) # 1310
 phch_sam[phch_sam$value_fin<0 ,] # Many maxTU (and sumTU?) values are below zero.
+nrow(phch_sam[phch_sam$value_fin==0 ,]) # 260
 ```
 
 
@@ -935,25 +964,64 @@ cast_envi  <- lapply(cast_envi ,
 ```
 
 
+```{r save-final-psm-datasets}
+#saveRDS(cast_envi, file.path('cache', 'psm_final.rds'))
+cast_envi <- readRDS(file.path('cache', 'psm_final.rds'))
+```
+
+
 Try out CCA
 ```{r cca}
-
+## July
 names(cast_envi[["07"]])
 
 dia_cca_07 <- cca(cast_ge_cca[["07"]] ~ agriculture + conductivity + maxTU + o_phosphat_p + ortho_phosphat + oxygen + pH + sumTU + temperature + TOC + tot_N, cast_envi[["07"]])
-
 dia_cca_07
-plot(dia_cca_07)
 
-#dia_cca <-lapply(cast_ge_cca, function(x) {cca(cast_ge_cca ~ agriculture + conductivity + o-Phosphat-P + #ortho-Phosphat + pH + temperature + tot-N, cast_envi)})
+# Plot
+plot_cca_07 <- plot(dia_cca_07, main = "CCA July")
+windows()
+savePlot(filename="figures/plot_cca_07", type="png")
+
+## September
 dia_cca_09 <- cca(cast_ge_cca[["09"]] ~ agriculture + conductivity + maxTU + o_phosphat_p + ortho_phosphat + oxygen + pH + sumTU + temperature + TOC + tot_N, cast_envi[["09"]])
 
 dia_cca_09
-plot(dia_cca_09)
+# Plot
+plot_cca_09 <- plot(dia_cca_09, main = "CCA September")
+savePlot(filename="figures/plot_cca_09", type="png")
+dev.off()
 
+
+cca_list <- list(dia_cca_07, dia_cca_09)
 #the arrow points to the direction
 #of the gradient, and its length indicates the strength of the variable
+
+# Combine both months with for loop
+# Does not work yet...
+
+#for (i in 1:length(cast_ge_cca)) {
+#  cca(cast_ge_cca[[i]] ~ agriculture + conductivity + maxTU + o_phosphat_p + ortho_phosphat + oxygen + pH #+ sumTU + temperature + TOC + tot_N, cast_envi[[i]])
+#}
 ```
+
+
+## Permutation tests in CCA, forwards selection and parsimonious CCA 
+pp. 205 Numerical Ecology with R
+
+Test for significans of CCA results by permutations
+```{r}
+anova(dia_cca_07, step = 1000)
+anova(dia_cca_07,by="axis", step = 1000)
+
+# Permutation test of the overall analysis
+lapply(cca_list, function(x) {anova(x, step = 1000)})
+
+# Permutation test of each axis
+lapply(cca_list, function(x) {anova(x, by="axis", step = 1000)})
+```
+
+
 
 
 # Check for collinearity. First, over the years 2005-2012 (years for which enough diatom data is available). Then, check all years seperately.
