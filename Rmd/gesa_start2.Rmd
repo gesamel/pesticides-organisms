@@ -795,7 +795,7 @@ Which data to use for tot-P??
     - tot-P
     - tot-N +
     - TOC +
-
+    
 
 ### calculate TU from EC50
 TU = log10(concentration of compound / EC50)
@@ -905,6 +905,7 @@ nrow(phch_sam)  # 11483
 #phch_sam <- phch_sam[!phch_sam$name=="agriculture" ,] 
 ```
 
+
 Join phch_sam on dia_sam_cca by site_id to exclude all samples that were not taken at a diatom sampling site.
 
 Also join dia_sam_cca on phch_sam by site_id to exclude all diatom samples were no phys-chem parameters were taken. --> does not need to be performed
@@ -963,10 +964,46 @@ cast_envi  <- lapply(cast_envi ,
 
 ```
 
+### state as variable
+```{r state-as-variable}
+# Create variable for state
+phch_unique_siteid <-phch_sam[!duplicated(phch_sam$site_id),]
 
+phch_sam_state <- phch_unique_siteid %>%
+  mutate(state = sub('_.*$','', phch_unique_siteid$site_id)) %>%
+  select(site_id, state)
+# mutate matches the pattern i.e. first occurence of _ to the end of the string and replace with ''
+
+phch_sam_state$state <- as.factor(phch_sam_state$state)
+
+length(unique(phch_sam$site_id))
+length(unique(phch_sam_state$site_id))
+ncol(cast_envi[[2]])
+
+# saveRDS(phch_sam_state, file.path('cache', 'phch_sam_state.rds'))
+# phch_sam_state <- readRDS(file.path('cache', 'phch_sam_state.rds'))
+
+phch_sam1 <- bind_rows(phch_sam, phch_sam_state)
+
+#cast_envi_1 <- bind_cols(cast_envi[[1]], phch_sam_state)
+# Do binding to both lsit elements:
+
+lapply()
+for (i in 1:length(cast_envi)) {
+  bind_cols(cast_envi[[i]], phch_sam_state)
+}
+
+# Column `value_fin` can't be converted from numeric to character/ to factor
+
+# Can a CCA be done on character values ??
+```
+
+Save final datasets
 ```{r save-final-psm-datasets}
 #saveRDS(cast_envi, file.path('cache', 'psm_final.rds'))
 cast_envi <- readRDS(file.path('cache', 'psm_final.rds'))
+
+cast_ge_cca <- readRDS(file.path('cache', 'dia_ge_final.rds'))
 ```
 
 
@@ -979,14 +1016,14 @@ dia_cca_07 <- cca(cast_ge_cca[["07"]] ~ agriculture + conductivity + maxTU + o_p
 dia_cca_07
 
 # Plot
-plot_cca_07 <- plot(dia_cca_07, main = "CCA July")
 windows()
+plot_cca_07 <- plot(dia_cca_07, main = "CCA July")
 savePlot(filename="figures/plot_cca_07", type="png")
 
 ## September
 dia_cca_09 <- cca(cast_ge_cca[["09"]] ~ agriculture + conductivity + maxTU + o_phosphat_p + ortho_phosphat + oxygen + pH + sumTU + temperature + TOC + tot_N, cast_envi[["09"]])
-
 dia_cca_09
+
 # Plot
 plot_cca_09 <- plot(dia_cca_09, main = "CCA September")
 savePlot(filename="figures/plot_cca_09", type="png")
@@ -994,69 +1031,81 @@ dev.off()
 
 
 cca_list <- list(dia_cca_07, dia_cca_09)
+
 #the arrow points to the direction
 #of the gradient, and its length indicates the strength of the variable
 
 # Combine both months with for loop
-# Does not work yet...
+# Does not work yet, no output...
 
 #for (i in 1:length(cast_ge_cca)) {
 #  cca(cast_ge_cca[[i]] ~ agriculture + conductivity + maxTU + o_phosphat_p + ortho_phosphat + oxygen + pH #+ sumTU + temperature + TOC + tot_N, cast_envi[[i]])
 #}
 ```
-
+The (unadjusted ???)explained (i.e. constrained) inertia of the July CCA is 14.75 % and of the September CCA it is 13.49 %.
 
 ## Permutation tests in CCA, forwards selection and parsimonious CCA 
 pp. 205 Numerical Ecology with R
 
 Test for significans of CCA results by permutations
-```{r}
-anova(dia_cca_07, step = 1000)
-anova(dia_cca_07,by="axis", step = 1000)
-
+```{r permutation-test-of-cca-results}
 # Permutation test of the overall analysis
 lapply(cca_list, function(x) {anova(x, step = 1000)})
 
 # Permutation test of each axis
 lapply(cca_list, function(x) {anova(x, by="axis", step = 1000)})
 ```
+The permutation test of the overall analysis indicates a significant model for the month Jula (p = 0.012) and a very significant model for the month September (p = 0.004).
 
+The permutation test for each axis indicates a significant first axis (p = 0.020) for July. For the CCA for September, also only the first axis was significant (p = 0.007).
 
+```{r forward-selection}
 
-
-# Check for collinearity. First, over the years 2005-2012 (years for which enough diatom data is available). Then, check all years seperately.
-```{r collinearity-check, echo=TRUE, message=FALSE}
-## Check for collinearity between explanatory data
-# 
-panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor)
-{
-  usr <- par("usr"); on.exit(par(usr))
-  par(usr = c(0, 1, 0, 1))
-  r <- abs(cor(x, y, use = "complete.obs"))
-  txt <- format(c(r, 0.123456789), digits = digits)[1]
-  txt <- paste(prefix, txt, sep = "")
-  if (missing(cex.cor)) 
-    cex <- 0.8/strwidth(txt)
-  
-  test <- cor.test(x,y)
-  # borrowed from printCoefmat
-  Signif <- symnum(test$p.value, corr = FALSE, na = FALSE,
-                   cutpoints = c(0, 0.05, 0.1, 1),
-                   symbols = c("*", ".", " "))
-  
-  text(0.5, 0.5, txt, cex = cex * r)
-  text(.8, .8, Signif, cex = cex, col = 2)
+for (i in 1:length(cast_ge_cca)) {
+  ordistep(cca(cast_ge_cca[[i]]~1, data = cast_envi[[i]]), scope = formula(cca_list[[i]]), direction = "forward", pstep = 1000)
 }
-pairs(envi_cast[ ,1:10], 
-      lower.panel = panel.smooth, upper.panel = panel.cor)
-
-# Figure margins too large to show all the envi-variables.
-
-# Shows correlation matrix. --> Too large to be displayed completely
-cor(envi_cast, use = "complete.obs")
-
-# VIF
-sort(vif(envi_cast))
 
 ```
+For July, the most parsimonious model is cast_ge_cca[[i]] ~ ortho_phosphat + oxygen
+For September, the most parsimonious model is cast_ge_cca[[i]] ~ ortho_phosphat + conductivity + TOC + oxygen
 
+```{r parsimonious-cca}
+# July
+dia_cca_pars_07 <- cca(cast_ge_cca[["07"]] ~ ortho_phosphat + oxygen, cast_envi[["07"]])
+dia_cca_pars_07
+
+# September
+dia_cca_pars_09 <- cca(cast_ge_cca[["09"]] ~ ortho_phosphat + + conductivity + TOC + oxygen, cast_envi[["09"]])
+dia_cca_pars_09
+
+# Bind both CCAs to one list
+cca_list_pars <- list (dia_cca_pars_07, dia_cca_pars_09)
+
+# Permutation test of the overall analysis
+lapply(cca_list_pars, function(x) {anova(x, step = 1000)})
+
+# Permutation test of each axis
+lapply(cca_list_pars, function(x) {anova(x, by="axis", step = 1000)})
+```
+The parsimonious CCA for July and September were both highly significant (p = 0.001)
+The permutation test for each axis indicated that both axes of the July CCA were significant (p = 0.001 and p = 0.002). The permutation test for the September CCA indicates that only the first two axes were significant (p = 0.001 and p = 0.012). 
+
+The explained (i.e. constrained) inertia of the July CCA was 14.75 % and of the September CCA it was 13.49 %. The explained inertia of the parsimonious CCAs was 6.84 % for July and 8.03 % for Septmeber.This drop is compensated by a clearer model with two significant canonical axes instead of one for both months.
+
+```{r vif}
+lapply(cca_list, function(x) vif.cca(x))
+lapply(cca_list_pars, function(x) vif.cca(x))
+```
+The parsimonious CCAs have very low variance inflation factors and thus, parsimony has paid off.
+
+```{r plot-parsimonious-CCA}
+windows()
+plot_cca_pars_07 <-plot(dia_cca_pars_07, main = "parsimonious CCA July")
+identify(plot_cca_pars_07, what="species")  # manually assign which species should be shown
+identify(plot_cca_pars_07, what="sites")    # sites
+savePlot(filename="figures/plot_cca_pars_07", type="png")
+
+plot_cca_pars_09 <-plot(dia_cca_pars_09, main = "parsimonious CCA September")
+savePlot(filename="figures/plot_cca_pars_09", type="png")
+dev.off()
+```
