@@ -1038,7 +1038,7 @@ plot_cca_07 <- plot(dia_cca_07, main = "CCA July")
 savePlot(filename="figures/plot_cca_07", type="png")
 
 ## September
-dia_cca_09 <- cca(cast_ge_cca[["09"]] ~ agriculture + conductivity + maxTU + o_phosphat_p + ortho_phosphat + oxygen + pH + sumTU + temperature + TOC + tot_N, cast_envi[["09"]])
+dia_cca_09 <- cca(cast_ge_cca[["09"]] ~ agriculture + conductivity + maxTU + o_phosphat_p + ortho_phosphat + oxygen + pH + sumTU + temperature + TOC + tot_N + state, cast_envi[["09"]])
 dia_cca_09
 
 # Plot
@@ -1061,6 +1061,8 @@ cca_list <- list(dia_cca_07, dia_cca_09)
 ```
 The (unadjusted ???)explained (i.e. constrained) inertia of the July CCA is 14.75 % and of the September CCA it is 13.49 %.
 
+With state variable: explaiedintertia of July CCA is 18.53 % and of the September CCA it s 16.34 %.
+
 ## Permutation tests in CCA, forwards selection and parsimonious CCA 
 pp. 205 Numerical Ecology with R
 
@@ -1072,9 +1074,11 @@ lapply(cca_list, function(x) {anova(x, step = 1000)})
 # Permutation test of each axis
 lapply(cca_list, function(x) {anova(x, by="axis", step = 1000)})
 ```
-The permutation test of the overall analysis indicates a significant model for the month Jula (p = 0.012) and a very significant model for the month September (p = 0.004).
+The permutation test of the overall analysis indicates a very significant model for the month Jula (p = 0.009) and a very significant model for the month September (p = 0.0018).
 
-The permutation test for each axis indicates a significant first axis (p = 0.020) for July. For the CCA for September, also only the first axis was significant (p = 0.007).
+The permutation test for each axis indicates a significant first axis (p = 0.019) for July. For the CCA for September, also only the first axis was significant (p = 0.011).
+
+For July it seems that the variable state makes the CCA more meaningful, for September, the state variable does not to explain more of the diatom community.
 
 ```{r forward-selection}
 
@@ -1083,12 +1087,14 @@ for (i in 1:length(cast_ge_cca)) {
 }
 
 ```
-For July, the most parsimonious model is cast_ge_cca[[i]] ~ ortho_phosphat + oxygen
-For September, the most parsimonious model is cast_ge_cca[[i]] ~ ortho_phosphat + conductivity + TOC + oxygen
+July: cast_ge_cca[[i]] ~ ortho_phosphat + oxygen + state + o_phosphat_p 
+is the most parsimonious model.
+September: cast_ge_cca[[i]] ~ ortho_phosphat + conductivity + TOC 
+With state variable, oxygen is not as important anymore.
 
 ```{r parsimonious-cca}
 # July
-dia_cca_pars_07 <- cca(cast_ge_cca[["07"]] ~ ortho_phosphat + oxygen, cast_envi[["07"]])
+dia_cca_pars_07 <- cca(cast_ge_cca[["07"]] ~ ortho_phosphat + oxygen + state + o_phosphat_p, cast_envi[["07"]])
 dia_cca_pars_07
 
 # September
@@ -1098,22 +1104,29 @@ dia_cca_pars_09
 # Bind both CCAs to one list
 cca_list_pars <- list (dia_cca_pars_07, dia_cca_pars_09)
 
+# Summary of both CCAs
+lapply(cca_list_pars, function(x) summary())
+# Last element: Find out position of state variables in plot to known which x belongs to which state.
+
+
 # Permutation test of the overall analysis
 lapply(cca_list_pars, function(x) {anova(x, step = 1000)})
 
 # Permutation test of each axis
 lapply(cca_list_pars, function(x) {anova(x, by="axis", step = 1000)})
 ```
-The parsimonious CCA for July and September were both highly significant (p = 0.001)
-The permutation test for each axis indicated that both axes of the July CCA were significant (p = 0.001 and p = 0.002). The permutation test for the September CCA indicates that only the first two axes were significant (p = 0.001 and p = 0.012). 
+The explained (i.e. constrained) inertia of the July CCA was 18.53 % and of the September CCA it was 16.34 %. The explained inertia of the parsimonious CCAs was 12.09 % for July and 8.27 % for Septmeber.This drop is compensated by a clearer model with two significant canonical axes instead of one for both months.
 
-The explained (i.e. constrained) inertia of the July CCA was 14.75 % and of the September CCA it was 13.49 %. The explained inertia of the parsimonious CCAs was 6.84 % for July and 8.03 % for Septmeber.This drop is compensated by a clearer model with two significant canonical axes instead of one for both months.
+The parsimonious CCA for July and September were both highly significant (p = 0.001)
+The permutation test for each axis indicated that only the first axis of the July CCA were significant (p = 0.011). The permutation test for the September CCA indicates that  the first axis was highly significant ( p = 0.001) and the second axis significant (p = 0.011). 
 
 ```{r vif}
 lapply(cca_list, function(x) vif.cca(x))
 lapply(cca_list_pars, function(x) vif.cca(x))
 ```
 The parsimonious CCAs have very low variance inflation factors and thus, parsimony has paid off.
+MaxTU and sumTU of the full model CCA have very high VIFs (> 15000). This applies only to September. WHY??
+For the parsimonious model of July, the state variables stateSN and stateST have still high VIFs (~10-11.  For the pars model of September, all VIFs are low (~1).
 
 ```{r plot-parsimonious-CCA}
 windows()
@@ -1123,6 +1136,8 @@ identify(plot_cca_pars_07, what="sites")    # sites
 savePlot(filename="figures/plot_cca_pars_07", type="png")
 
 plot_cca_pars_09 <-plot(dia_cca_pars_09, main = "parsimonious CCA September")
+identify(plot_cca_pars_09, what="species")  # manually assign which species should be shown
+identify(plot_cca_pars_09, what="sites")    # sites
 savePlot(filename="figures/plot_cca_pars_09", type="png")
-dev.off()
+# dev.off() # R session terminates when using this command. Do it manually instead.
 ```
