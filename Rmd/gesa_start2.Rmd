@@ -1005,6 +1005,9 @@ cast_envi_2 <- cbind(cast_envi[[2]], NewColumn=phch_sam_state_09)
 # Combine both tables to recreate cast_envi list
 cast_envi <- list(cast_envi_1, cast_envi_2)
 
+# Rename list elements
+names(cast_envi) <- c("07", "09")
+
 # Do binding to both list elements:
 #cast_envi_trial <- for (i in 1:length(cast_envi)) {
 #  cbind(cast_envi[[i]], phch_sam_state[[i]])
@@ -1026,7 +1029,7 @@ Try out CCA
 ## July
 names(cast_envi[["07"]])
 
-dia_cca_07 <- cca(cast_ge_cca[["07"]] ~ agriculture + conductivity + maxTU + o_phosphat_p + ortho_phosphat + oxygen + pH + sumTU + temperature + TOC + tot_N, cast_envi[["07"]])
+dia_cca_07 <- cca(cast_ge_cca[["07"]] ~ agriculture + conductivity + maxTU + o_phosphat_p + ortho_phosphat + oxygen + pH + sumTU + temperature + TOC + tot_N + state, cast_envi[["07"]])
 dia_cca_07
 
 # Plot
