@@ -918,6 +918,7 @@ nrow(phch_sam) # 11425
 nrow(dia_sam_cca) # 13437
 length(unique(dia_sam_cca$site_id)) #228
 length(unique(phch_sam$site_id))    #228
+length(unique(phch_sam$site_id)) 
 
 ####### these steps dont have to be performed ########
 dia_sam_cca1 <- semi_join(dia_sam_cca, phch_sam[phch_sam$name=="maxTU" | phch_sam$name=="sumTU" ,], by = c("site_id", "month"))
@@ -966,36 +967,49 @@ cast_envi  <- lapply(cast_envi ,
 
 ### state as variable
 ```{r state-as-variable}
-# Create variable for state
-phch_unique_siteid <-phch_sam[!duplicated(phch_sam$site_id),]
+# create loop/lapply function to shorten skript
 
-phch_sam_state <- phch_unique_siteid %>%
-  mutate(state = sub('_.*$','', phch_unique_siteid$site_id)) %>%
+# Create variable for state
+phch_siteid_07 <- phch_sam %>%
+  filter(month=="07") %>% 
+  distinct(site_id, .keep_all = TRUE)
+
+phch_siteid_09 <- phch_sam %>%
+  filter(month=="09") %>% 
+  distinct(site_id, .keep_all = TRUE)
+
+# Dataset with only site_id and state as anew variable
+phch_sam_state_07 <- phch_siteid_07 %>%
+  mutate(state = sub('_.*$','', phch_siteid_07$site_id)) %>%
+  select(site_id, state)
+
+phch_sam_state_09 <- phch_siteid_09 %>%
+  mutate(state = sub('_.*$','', phch_siteid_09$site_id)) %>%
   select(site_id, state)
 # mutate matches the pattern i.e. first occurence of _ to the end of the string and replace with ''
 
-phch_sam_state$state <- as.factor(phch_sam_state$state)
+phch_sam_state_07$state <- as.factor(phch_sam_state_07$state)
+phch_sam_state_09$state <- as.factor(phch_sam_state_09$state)
 
-length(unique(phch_sam$site_id))
-length(unique(phch_sam_state$site_id))
-ncol(cast_envi[[2]])
+# Set site_id as rownames
+rownames(phch_sam_state_07) <- phch_sam_state_07$site_id
+phch_sam_state_07$site_id <- NULL
 
-# saveRDS(phch_sam_state, file.path('cache', 'phch_sam_state.rds'))
-# phch_sam_state <- readRDS(file.path('cache', 'phch_sam_state.rds'))
+rownames(phch_sam_state_09) <- phch_sam_state_09$site_id
+phch_sam_state_09$site_id <- NULL
 
-phch_sam1 <- bind_rows(phch_sam, phch_sam_state)
+# Bind new column to table
+cast_envi_1 <- cbind(cast_envi[[1]], NewColumn=phch_sam_state_07)
+cast_envi_2 <- cbind(cast_envi[[2]], NewColumn=phch_sam_state_09)
 
-#cast_envi_1 <- bind_cols(cast_envi[[1]], phch_sam_state)
-# Do binding to both lsit elements:
+# Combine both tables to recreate cast_envi list
+cast_envi <- list(cast_envi_1, cast_envi_2)
 
-lapply()
-for (i in 1:length(cast_envi)) {
-  bind_cols(cast_envi[[i]], phch_sam_state)
-}
-
-# Column `value_fin` can't be converted from numeric to character/ to factor
-
-# Can a CCA be done on character values ??
+# Do binding to both list elements:
+#cast_envi_trial <- for (i in 1:length(cast_envi)) {
+#  cbind(cast_envi[[i]], phch_sam_state[[i]])
+#}
+# Does not work, empty output
 ```
 
 Save final datasets
