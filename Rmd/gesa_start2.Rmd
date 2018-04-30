@@ -11,12 +11,6 @@ editor_options:
   
 ---
 
-# Introduction
-
-Changes in the communty of diatoms in response to several environmental factors have been well studied. Thereby, changes in diatom community structure  can be taken as a proxy for environmental pollution with e.g. nutrients. However, the response of the diatom community to pesticides has not been well studied so far. Especially the response to herbicides is of special concern since they are the type of herbicides that are most toxic to diatoms. 
-
-In this study, monitoring data from lotic waterbodies in Germany from the years 2005 - 2012 is used to perform Correspondance Analysis (CA). With ordination via CA, the main trend of variation can be visualized. With subsequent Canonical Correspondance Analysis (CCA), this trend can be connected to environmental descriptors. Those environmental descriptors are represented by a dataset of physical-chemical data and herbicide data sampled in lotic waterbodies of Germany as well.
-
 # Data Analysis
 
 ## Setup
@@ -1023,8 +1017,34 @@ cast_envi <- readRDS(file.path('cache', 'psm_final.rds'))
 cast_ge_cca <- readRDS(file.path('cache', 'dia_ge_final.rds'))
 ```
 
+### Collinearity
+```{r}
+# Create dataset without variable "state" since it cannot be used during calculation of correlation
+cast_envib <- lapply(cast_envi, function(x) { x["state"] <- NULL; x })
 
-Try out CCA
+# Calculate correlations between variables
+lapply(cast_envib, function(x) {cor(x, use = "complete.obs")})
+
+```
+Correlations
+maxTU & sumTU: 
+July: 0.87230938
+September: 0.999956837
+
+o_phosphate_p & ortho_phosphat: 
+July: 0.60779726
+September: 0.46383438
+
+--> sumTU or maxTU must be excluded!
+
+For July, sumTU and maxTU both remain in the dataset and further variable selection will be based on forward selection. For September, only maxTU will remain in the dataset.According to (@Schafer.2013), there is not a great difference between the results of sumTU and maxTU, but in agricultural regions, the toxic effects are mainly driven by a single compound and therefor, maxTU will remain in the dataset although it seems like in this dataset, maxTU and sumTU are so highly correlated, the selection of either one of the variables would not make a big difference.
+
+```{r remove-sumtu-from-july}
+cast_envi[[2]][["sumTU"]] <- NULL
+```
+
+
+### Try out CCA
 ```{r cca}
 ## July
 names(cast_envi[["07"]])
@@ -1038,7 +1058,7 @@ plot_cca_07 <- plot(dia_cca_07, main = "CCA July")
 savePlot(filename="figures/plot_cca_07", type="png")
 
 ## September
-dia_cca_09 <- cca(cast_ge_cca[["09"]] ~ agriculture + conductivity + maxTU + o_phosphat_p + ortho_phosphat + oxygen + pH + sumTU + temperature + TOC + tot_N + state, cast_envi[["09"]])
+dia_cca_09 <- cca(cast_ge_cca[["09"]] ~ agriculture + conductivity + maxTU + o_phosphat_p + ortho_phosphat + oxygen + pH + temperature + TOC + tot_N + state, cast_envi[["09"]])
 dia_cca_09
 
 # Plot
@@ -1061,7 +1081,20 @@ cca_list <- list(dia_cca_07, dia_cca_09)
 ```
 The (unadjusted ???)explained (i.e. constrained) inertia of the July CCA is 14.75 % and of the September CCA it is 13.49 %.
 
-With state variable: explaiedintertia of July CCA is 18.53 % and of the September CCA it s 16.34 %.
+With state variable: explained intertia of July CCA is 18.53 % (17.46 ??) and of the September CCA it s 15.74 %.
+
+### VIF
+```{r vif}
+lapply(cca_list, function(x) vif.cca(x))
+#lapply(cca_list_pars, function(x) vif.cca(x))
+```
+VIF = 1 (Not correlated)
+1 < VIF < 5 (Moderately correlated)
+VIF >=5 (Highly correlated)
+
+
+State variables have high variance inflation factors but since variable is a factor, I will ignore this. 
+July: SumTU and maxTU have VIFs of 4.525703 and 4.518743, respectively, which is still okay. All other VIFs are below 4.
 
 ## Permutation tests in CCA, forwards selection and parsimonious CCA 
 pp. 205 Numerical Ecology with R
@@ -1074,31 +1107,31 @@ lapply(cca_list, function(x) {anova(x, step = 1000)})
 # Permutation test of each axis
 lapply(cca_list, function(x) {anova(x, by="axis", step = 1000)})
 ```
-The permutation test of the overall analysis indicates a very significant model for the month Jula (p = 0.009) and a very significant model for the month September (p = 0.0018).
+The permutation test of the overall analysis indicates a significant model for the month Jula (p = 0.019) and a very significant model for the month September (p = 0.01).
 
-The permutation test for each axis indicates a significant first axis (p = 0.019) for July. For the CCA for September, also only the first axis was significant (p = 0.011).
+The permutation test for each axis indicates a significant first axis (p = 0.024) for July. For the CCA for September, also only the first axis was significant (p = 0.019).
 
-For July it seems that the variable state makes the CCA more meaningful, for September, the state variable does not to explain more of the diatom community.
+--> Exact values will change every time because different steps wil be performed, model is compared to different random models.
 
+### Forward selection of variables
 ```{r forward-selection}
-
 for (i in 1:length(cast_ge_cca)) {
   ordistep(cca(cast_ge_cca[[i]]~1, data = cast_envi[[i]]), scope = formula(cca_list[[i]]), direction = "forward", pstep = 1000)
 }
 
 ```
-July: cast_ge_cca[[i]] ~ ortho_phosphat + oxygen + state + o_phosphat_p 
+July: cast_ge_cca[[i]] ~ ortho_phosphat + oxygen 
 is the most parsimonious model.
+
 September: cast_ge_cca[[i]] ~ ortho_phosphat + conductivity + TOC 
-With state variable, oxygen is not as important anymore.
 
 ```{r parsimonious-cca}
 # July
-dia_cca_pars_07 <- cca(cast_ge_cca[["07"]] ~ ortho_phosphat + oxygen + state + o_phosphat_p, cast_envi[["07"]])
+dia_cca_pars_07 <- cca(cast_ge_cca[["07"]] ~ ortho_phosphat + oxygen, cast_envi[["07"]])
 dia_cca_pars_07
 
 # September
-dia_cca_pars_09 <- cca(cast_ge_cca[["09"]] ~ ortho_phosphat + + conductivity + TOC + oxygen, cast_envi[["09"]])
+dia_cca_pars_09 <- cca(cast_ge_cca[["09"]] ~ ortho_phosphat + + conductivity + TOC, cast_envi[["09"]])
 dia_cca_pars_09
 
 # Bind both CCAs to one list
@@ -1115,29 +1148,21 @@ lapply(cca_list_pars, function(x) {anova(x, step = 1000)})
 # Permutation test of each axis
 lapply(cca_list_pars, function(x) {anova(x, by="axis", step = 1000)})
 ```
-The explained (i.e. constrained) inertia of the July CCA was 18.53 % and of the September CCA it was 16.34 %. The explained inertia of the parsimonious CCAs was 12.09 % for July and 8.27 % for Septmeber.This drop is compensated by a clearer model with two significant canonical axes instead of one for both months.
+The explained (i.e. constrained) inertia of the July CCA was 18.53 % and of the September CCA it was 16.34 %. The explained inertia of the parsimonious CCAs was 6.8 % for July and 6.8 % for Septmeber.This drop is compensated by a clearer model with two significant canonical axes instead of one for both months.
 
 The parsimonious CCA for July and September were both highly significant (p = 0.001)
-The permutation test for each axis indicated that only the first axis of the July CCA were significant (p = 0.011). The permutation test for the September CCA indicates that  the first axis was highly significant ( p = 0.001) and the second axis significant (p = 0.011). 
-
-```{r vif}
-lapply(cca_list, function(x) vif.cca(x))
-lapply(cca_list_pars, function(x) vif.cca(x))
-```
-The parsimonious CCAs have very low variance inflation factors and thus, parsimony has paid off.
-MaxTU and sumTU of the full model CCA have very high VIFs (> 15000). This applies only to September. WHY??
-For the parsimonious model of July, the state variables stateSN and stateST have still high VIFs (~10-11.  For the pars model of September, all VIFs are low (~1).
+The permutation test for each axis indicated that both axes of the July CCA were significant (p = 0.002 and 0.003). The permutation test for the September CCA indicates that the first 2 axes were significant ( p = 0.001 and 0.007). 
 
 ```{r plot-parsimonious-CCA}
 windows()
 plot_cca_pars_07 <-plot(dia_cca_pars_07, main = "parsimonious CCA July")
 identify(plot_cca_pars_07, what="species")  # manually assign which species should be shown
-identify(plot_cca_pars_07, what="sites")    # sites
+#identify(plot_cca_pars_07, what="sites")    # sites
 savePlot(filename="figures/plot_cca_pars_07", type="png")
 
 plot_cca_pars_09 <-plot(dia_cca_pars_09, main = "parsimonious CCA September")
 identify(plot_cca_pars_09, what="species")  # manually assign which species should be shown
-identify(plot_cca_pars_09, what="sites")    # sites
+#identify(plot_cca_pars_09, what="sites")    # sites
 savePlot(filename="figures/plot_cca_pars_09", type="png")
 # dev.off() # R session terminates when using this command. Do it manually instead.
 ```
