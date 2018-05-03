@@ -217,7 +217,6 @@ landuse = dbGetQuery(con, "SELECT site_id, atkis_perc
 
 Join physical-chemical data with EC50 data.
 ```{r join-ec50}
-nrow(phch_sam) # 5268995
 # Join phch with ec50 to include casnr
 phch_sam = left_join(phch_sam, ec50, by = "casnr")
 
@@ -226,8 +225,6 @@ phch_sam = left_join(phch_sam, ec50, by = "casnr")
 
 phch_sam = phch_sam %>%
   filter(!ec50f_al4896_fin=="" | psm == FALSE)
-
-nrow(phch_sam) #5113250
 
 ```
 
@@ -238,13 +235,8 @@ For the CCA later on, a dataset was created containing only diatom samples where
 
 ```{r join-on-site-year, echo=TRUE, message=FALSE}
 # Diatom data
-
 dia_sam_cca <- semi_join(dia_sam, phch_sam[phch_sam$psm==TRUE & !phch_sam$value_fin == 0,], by = c("site_id", "month"))
-nrow(dia_sam_cca) # 37415
 
-##AS: like this you can keep it an sf-object:
-##AS: generally you can handle sf-Objects with dplyr like data.frames and tibbles
-#dia_sites_cca <- dia_sites_geo[ dia_sites_geo$site_id %in% psm_sites_geo$site_id, ]
 ```
 
 
@@ -400,12 +392,8 @@ dia_sam_cca = dia_sam_cca %>%
 ```
 
 ## Taxon frequency
-[@Marchant.2002] suggests to remove rare species as only common species produce information that can reliably be linked to present environmental gradients. [@Cao.2001] suggests the removal of rare species if samples were taken over a large spatial scale which holds true for the present dataset. Furthermore, Chi-square distance, which is the distance measure used in CA and CCA, gives more weight to rare species. Due to this reason, (@Legendre.2012) suggest to remove rare species from the analysis. Here, 4 datasets are created: Species and genera that occur at less than 20 % of the sites were removed, respectively and species and genera that occur in less than 5 % of the samples were removed, respectively (@Fernandez.2016).
 
-The analysis was done for both, species and genus data and therefore, all procedures were performed for species data and genus data seperately from here on. According to (@Rimet.2012), analysis with a taxonomic resolution of genus performs as well as a resolution of species level in many cases. Similarly, (@Larras.2014) found that diatom sensitivity to herbicides can be attributed to their phylogeny. They reported that centric and araphid diatoms (Thalassiosirales and Fragilariales, respectively
-) were most sensitive to the herbicides whereas pennates (Cymbellales, Naviculales and Bacillariales)
-) were more robust.
-
+Removal of rare taxa
 ```{r  delete-rare-taxa, echo=TRUE, message=FALSE}
 ## Rare = taxa that occur at less than 5 % of the samples
 sampleN = length(unique(dia_sam$id_pn))
@@ -471,7 +459,6 @@ dia_sam_N_ge_cca = dia_sam_ge_cca %>%
        summarise(N=n())
 plot(density(dia_sam_N_ge_cca$N), main="Genus density")
 
-
 ```
 
 ```{r explore diatom-data}
@@ -493,7 +480,7 @@ sum(dia_sam_ge$cover==0)
 
 ## Transform data to get from long to wide data
 
-For the subsequent analysis, the data needed to be transformend from long to wide format. If several combinations of (`site_id`)  and (`species`) were present, the 95th percentile was taken to aggregate them. Further, the first column was stored as rowname. The aggregation was first performed over all years and over all months seperately.
+For the subsequent analysis, the data needed to be transformend from long to wide format. If several combinations of (`site_id`)  and (`species`) were present, the 95th percentile was taken to aggregate them. Further, the first column was stored as rowname.
 
 #### graphical inspection of years
 ```{r ggplot-year}
@@ -522,8 +509,6 @@ gr3
 
 The data were aggregated per month by the 95th percentile of the cover. The data were then transformed from long to wide format.
 
-Diatom communities follow a seasonal succession which might be more prominent than the interanual succession. (@Hausmann.2007) showed that for lakes, the spring and summer conditions had a strong impact on the diatom composition and productivity that was stronger than the impact of changing annual mean temperatures. Similarly,  (@Kirilova.2008) observed a seasonal succession of diatoms in  lakes. The predominant diatoms in winter and spring were of the genus *Stephanodiscus* while species of the genera *Stephanodiscus*, *Fragilaria*, and *Nitzschia* were the most abundant diatoms in summer and autumn. To account for this seasonal variability of diatom composition, it seemed reasonable to summarize the diatom data for each month over all years.
- 
 #### Species
 
 ```{r cast-species, echo=TRUE, message=FALSE}
@@ -611,8 +596,7 @@ cast_ge_cca <- readRDS(file.path('cache', 'dia_ge_final.rds'))
 
 ### DCA
 
-A Detrended Correspondance Analysis (DCA) was performed in order to decide whether it is appropriate to conduct a unimodal gradient method. DCA was introduced by (@Hill.1980). If the length of the first DCA axis, scaled in units of standard deviations (S.D.), is > 4 S.D. a complete species turnover can be assumed and a unimodal gradient method is appropriate to use. A linear gradient method would be more appropriate for a length of the first axes < 3 S.D., indicating an incomplete change of species composition. For an axis length between 3 and 4, both types of methods are appropriate to use (@Leps.2003).
-
+Gradient length
 #### Species
 
 ```{r dca-species, echo=TRUE, message=FALSE}
@@ -638,8 +622,6 @@ lapply(cast_ge_cca, function(x) {plot(decorana(x), display="both")})
 For genus data for the cca, the length of the first axis is > 4 S.D. in all months and therefore, a unimodal gradient can be assumed for all months.
 
 ## CA
-
-Correspondance Analysis (CA) was used to determine the major trends of variation of the diatom community before including any environmental data. CA is an ordination method and hence reduces data of multidimensional space to a 2- or 3-dimensional representation with minimal loss of information. The dimensions included in the ordination plot are the ones with the highest amount of variance and thus display the greatest part of variability of the data. The advantage of CA is that, by using weighted averages ordination, sites and species are ordered at the same time into the same space. In the ordination plot, similar communities and species are close together while dissimilar communities and species are further apart.
 
 ### Species
 
@@ -667,11 +649,6 @@ for (i in 1:length(dianame_sp)) {
            pcol="red", pch="+")
 }
 ```
-It seems like there are not one or two main factors explaining the variance in diatom composition but many since the fraction of cumulative explained variation is also not very high when considering several axes.
-I.e.
-July: cum explained variance of 1.+2. axes:0.12000
-August: cum explained variance of 1.+2. axes: 0.09192
-September: cum explained variance of 1. + 2. axes: 0.11570
 
 ### Genus
 
@@ -682,12 +659,6 @@ ca_ge <-lapply(cast_ge, function(x) {cca(x)})
 # Compute summary of CA results to inspect proportion of variance explained by each axis.
 lapply(ca_ge, function(x) {summary(x)})
 ```
-
-The cumulated explained variance of the first two axes is above 20 % in all months which is a much higher value than when taking species for the CA. Therefore, it might make more sense to proceed analysis with genus data instead of with species data.
-I.e.: 
-July: 1.+2. CA: 19.9 % of cumulative explaned variance
-August: 1.+2. CA: 19.8 % of cumulative explaned variance
-September:  1.+2. CA: 23.5 % of cumulative explaned variance
 
 ```{r  plot-ca-genus, echo=TRUE, message=FALSE}
 # Compute biplots without names
@@ -732,37 +703,31 @@ for (i in 1:3) {
 `cast_ge_cca`is the diatom data to use for this part.
 
 All physical-chemical data were deleted that were not taken at the same site and in the same month as a diatom sample.
---> Nochmal neu berechnen wenn weitere Monate rausgeschmissen wurden.
 ```{r join-phch, echo=TRUE, message=FALSE}
-nrow(phch_sam) # 1234777   # 5113250 !
 phch_sam <- semi_join(phch_sam, dia_sam_cca, by =c("site_id","month")) 
-nrow(phch_sam) # 21695    # 72066 !
-
 ```
 
 ### Keep only certain environmental variables
 
 ```{r envi-variables, echo=TRUE, message=FALSE}
-phch_list = phch_sam %>%
+phch_list_all = phch_sam %>%
   filter(psm == FALSE) %>%
   distinct(name) %>%
   arrange(name)
-phch_list #list of all environmental variables that are not herbicides
+phch_list_all #list of all non-psm environmental variables
 
-nrow(phch_sam[phch_sam$name=="Elektrische LeitfÃ¤higkeit (20Â°C)", ]) #2133  # 885
-nrow(phch_sam[phch_sam$name=="Elektrische LeitfÃ¤higkeit (25Â°C)", ]) #5034  # 1916
+# Conductivity
+nrow(phch_sam[phch_sam$name=="Elektrische LeitfÃ¤higkeit (20Â°C)", ]) # 885
+nrow(phch_sam[phch_sam$name=="Elektrische LeitfÃ¤higkeit (25Â°C)", ]) # 1916
 # More data available for conductivity at 25 degree
 
 # o-Phosphat-P,ortho-Phosphat
-nrow(phch_sam[phch_sam$name=="o-Phosphat-P", ]) #2391  # 1018
-nrow(phch_sam[phch_sam$name=="ortho-Phosphat", ]) #2070 #PO4 3-  # 891
+nrow(phch_sam[phch_sam$name=="o-Phosphat-P", ]) # 1018
+nrow(phch_sam[phch_sam$name=="ortho-Phosphat", ]) ##PO4 3-  # 891
 # Is that the same just with a different name? Can I then combine them? if yes --> Just rename one variable to the other
 
 phch_sam <- phch_sam %>%
   filter(psm == 'TRUE' | name %in% c("Wassertemperatur", "pH-Wert (Feld)", "Elektrische LeitfÃ¤higkeit (25Â°C)", "SauerstoffsÃ¤ttigung", "gesamter organisch gebundener Kohlenstoff", "Gesamt-Stickstoff" , "o-Phosphat-P", "ortho-Phosphat" ))
-
-# Rename o-Phosphat-P cells
-# phch_sam$name[phch_sam1$name=="o-Phosphat-P"] <- "ortho-Phosphat"
 
 # Rename all names
 phch_sam$name[phch_sam$name=="Wassertemperatur"] <- "temperature"
@@ -774,22 +739,7 @@ phch_sam$name[phch_sam$name=="Gesamt-Stickstoff"] <- "tot_N"
 phch_sam$name[phch_sam$name=="o-Phosphat-P"] <- "o_phosphat_p"
 phch_sam$name[phch_sam$name=="ortho-Phosphat"] <- "ortho_phosphat"
 
-nrow(phch_sam) # 10996  # 51429 if herbicides remain in dataset. Keep them!!  
-# 36449 !  --> In the beginning, all diatom samples were deleted that were not measured at any site where psm were taken and value_fin was == 0. This results in less phch samples that were taken at a diatom sampling site. This was recalculated and therefore, the numbers have changed.
-nrow(phch_sam[phch_sam$psm==TRUE,])  # 26408 datapoints are from herbicide data
 ```
-Which data to use for tot-P??
-
-    - Landwirtschaft (atkis_perc) + not as name and unit yet but as seperate column
-    - Temperature +
-    - pH +
-    - maxTU/Monat (2 wichtigsten Monate)
-    - conductivity +
-    - Sauerstoffgehalt +
-    - tot-P
-    - tot-N +
-    - TOC +
-    
 
 ### calculate TU from EC50
 TU = log10(concentration of compound / EC50)
@@ -799,7 +749,7 @@ Calculate the sumTU and the maxTU per site and date.
 phch_sam_y = phch_sam %>%
   filter(psm == TRUE) %>%
   mutate(TU = log10(value_fin) / ec50f_al4896_fin)
-nrow(phch_sam_y) # 7958   # 26408
+nrow(phch_sam_y) 
 
 nrow(phch_sam_y[phch_sam_y$value_fin=="0", ])
 # 24023
@@ -809,7 +759,6 @@ nrow(phch_sam_y[phch_sam_y$value_fin=="0", ])
 # remove infinite values
 phch_sam_y = phch_sam_y %>%
   filter(!is.infinite(TU)) 
-nrow(phch_sam_y)  # 24.4.: 2385 rows remain
 
 # calculate sumTU, maxTU
 phch_sam_y_TU = phch_sam_y %>%
@@ -817,7 +766,6 @@ phch_sam_y_TU = phch_sam_y %>%
   summarise(sumTU = sum(TU), maxTU = max(TU), total = n())
 # Good dataset of sumTU and maxTU
 # --> Needs to be included in phch_sam as variable in name and value column
-nrow(phch_sam_y_TU) # 622
 
 #phch_sam_y_TU <- phch_sam_y_TU[ ,phch_sam_y_TU$name]
 # column name must be sumTU and maxTU respectively
@@ -839,31 +787,20 @@ phch_TU_bind <- phch_TU_bind %>%
 phch_sam <- phch_sam[!phch_sam$psm==TRUE, ]
 
 # Bind table with phch_sam table
-# does not always work properly..
 phch_sam <- bind_rows(phch_sam, phch_TU_bind)
-
-
-#phch_sam2 = phch_sam %>%
-#  filter(! psm == TRUE)
-# does not work properly. WHY? Only removes new variables maxTU and sumTU
-
 
 # Year, month and day column need to be renewed since they do not exist for sumTU and maxTU
 phch_sam$year <- format(phch_sam$date, '%Y')  # Create column for year
 phch_sam$month <- format(phch_sam$date, '%m') # Create column for month
 phch_sam$day <- format(phch_sam$date, '%j')   # Create column for day of the year
 
-nrow(phch_sam)  
-unique(phch_sam$name)  #nrow=11365, maxTU, sumTU present. 
-# seems to work now
+
 ```
 
 Agricultural data.
 ```{r landuse-to-name-column}
 # Join landuse data with diatom dataset . Remove all landuse sites where diatoms haven't been sampled.
-nrow(landuse) #1302
 landuse = semi_join(landuse, dia_sam_cca, by = "site_id") # does not need to be joined by month since landuse is independent of date
-nrow(landuse) # 59
 
 # change column "atkis_perc" to "value_fin"
 names(landuse) [names(landuse) =="atkis_perc"] <- "value_fin"
@@ -882,7 +819,6 @@ landuse_09$month <- "09"
 
 # Bind landuse and landuse_09
 landuse <- bind_rows(landuse, landuse_09)
-nrow(landuse) # 118
 
 # Bind landuse table to phch_sam
 phch_sam <- bind_rows(phch_sam, landuse)
@@ -892,11 +828,6 @@ phch_list <- phch_sam %>%
   distinct(name) %>%
   arrange(name)
 phch_list
-
-nrow(phch_sam)  # 11483
-
-# nrow(phch_sam[phch_sam$name=="agriculture" ,] )
-#phch_sam <- phch_sam[!phch_sam$name=="agriculture" ,] 
 ```
 
 
@@ -904,28 +835,10 @@ Join phch_sam on dia_sam_cca by site_id to exclude all samples that were not tak
 
 Also join dia_sam_cca on phch_sam by site_id to exclude all diatom samples were no phys-chem parameters were taken. --> does not need to be performed
 ```{r}
-nrow(phch_sam) # 11483
 phch_sam <- semi_join(phch_sam, dia_sam_cca, by =c("site_id","month"))
-nrow(phch_sam) # 11425
-# normally, this step should not have to be needed. Where does the gap come from?
-
-nrow(dia_sam_cca) # 13437
-length(unique(dia_sam_cca$site_id)) #228
-length(unique(phch_sam$site_id))    #228
-length(unique(phch_sam$site_id)) 
-
-####### these steps dont have to be performed ########
-dia_sam_cca1 <- semi_join(dia_sam_cca, phch_sam[phch_sam$name=="maxTU" | phch_sam$name=="sumTU" ,], by = c("site_id", "month"))
-nrow(dia_sam_cca1)  # 13437  
-# no dia_sam_cca samples have to be excluded because they were not sampled at a site where herbicides were measured
-
-dia_sam_cca2 <- semi_join(dia_sam_cca, phch_sam, by = c("site_id", "month"))
-nrow(dia_sam_cca2) # 13437
-# at all diatom sampling sites, some phch_samples were taken
 ```
 
-
-How many negative values are in value_fin? Can CCA handle negative values?
+How many negative values are in value_fin? 
 ```{r}
 nrow(phch_sam[phch_sam$value_fin<0 ,]) # 1310
 phch_sam[phch_sam$value_fin<0 ,] # Many maxTU (and sumTU?) values are below zero.
@@ -972,7 +885,7 @@ phch_siteid_09 <- phch_sam %>%
   filter(month=="09") %>% 
   distinct(site_id, .keep_all = TRUE)
 
-# Dataset with only site_id and state as anew variable
+# Dataset with only site_id and state as new variable
 phch_sam_state_07 <- phch_siteid_07 %>%
   mutate(state = sub('_.*$','', phch_siteid_07$site_id)) %>%
   select(site_id, state)
@@ -1002,6 +915,15 @@ cast_envi <- list(cast_envi_1, cast_envi_2)
 # Rename list elements
 names(cast_envi) <- c("07", "09")
 
+# Which states are included in dataset?
+unique(cast_envi[[1]][["state"]])
+unique(cast_envi[[2]][["state"]])
+
+#for (i in 1: length(cast_envi)) {
+#  unique(cast_envi[[i]][["state"]])
+#}
+# Does not work, empty output
+
 # Do binding to both list elements:
 #cast_envi_trial <- for (i in 1:length(cast_envi)) {
 #  cbind(cast_envi[[i]], phch_sam_state[[i]])
@@ -1017,34 +939,7 @@ cast_envi <- readRDS(file.path('cache', 'psm_final.rds'))
 cast_ge_cca <- readRDS(file.path('cache', 'dia_ge_final.rds'))
 ```
 
-### Collinearity
-```{r}
-# Create dataset without variable "state" since it cannot be used during calculation of correlation
-cast_envib <- lapply(cast_envi, function(x) { x["state"] <- NULL; x })
-
-# Calculate correlations between variables
-lapply(cast_envib, function(x) {cor(x, use = "complete.obs")})
-
-```
-Correlations
-maxTU & sumTU: 
-July: 0.87230938
-September: 0.999956837
-
-o_phosphate_p & ortho_phosphat: 
-July: 0.60779726
-September: 0.46383438
-
---> sumTU or maxTU must be excluded!
-
-For July, sumTU and maxTU both remain in the dataset and further variable selection will be based on forward selection. For September, only maxTU will remain in the dataset.According to (@Schafer.2013), there is not a great difference between the results of sumTU and maxTU, but in agricultural regions, the toxic effects are mainly driven by a single compound and therefor, maxTU will remain in the dataset although it seems like in this dataset, maxTU and sumTU are so highly correlated, the selection of either one of the variables would not make a big difference.
-
-```{r remove-sumtu-from-july}
-cast_envi[[2]][["sumTU"]] <- NULL
-```
-
-
-### Try out CCA
+### CCA with all variables 
 ```{r cca}
 ## July
 names(cast_envi[["07"]])
@@ -1058,7 +953,7 @@ plot_cca_07 <- plot(dia_cca_07, main = "CCA July")
 savePlot(filename="figures/plot_cca_07", type="png")
 
 ## September
-dia_cca_09 <- cca(cast_ge_cca[["09"]] ~ agriculture + conductivity + maxTU + o_phosphat_p + ortho_phosphat + oxygen + pH + temperature + TOC + tot_N + state, cast_envi[["09"]])
+dia_cca_09 <- cca(cast_ge_cca[["09"]] ~ agriculture + conductivity + maxTU + o_phosphat_p + ortho_phosphat + oxygen + pH + sumTU + temperature + TOC + tot_N + state, cast_envi[["09"]])
 dia_cca_09
 
 # Plot
@@ -1087,19 +982,33 @@ With state variable: explained intertia of July CCA is 18.53 % (17.46 ??) and of
 ```{r vif}
 lapply(cca_list, function(x) vif.cca(x))
 #lapply(cca_list_pars, function(x) vif.cca(x))
+
+# Correlation between numeric and categorical variables
+hetcor(cast_envi[["07"]], ML = FALSE, std.err = TRUE, bins=4, pd=TRUE)
+hetcor(cast_envi[["09"]], ML = FALSE, std.err = TRUE, bins=4, pd=TRUE)
+
 ```
 VIF = 1 (Not correlated)
 1 < VIF < 5 (Moderately correlated)
 VIF >=5 (Highly correlated)
 
 
-State variables have high variance inflation factors but since variable is a factor, I will ignore this. 
+State variable has high VIFs -> method not appropriate for categorical variables 
+September: maxTU and sumTu have very high VIFs.
 July: SumTU and maxTU have VIFs of 4.525703 and 4.518743, respectively, which is still okay. All other VIFs are below 4.
+
+Calculation of Pearson product-moment correlations between numeric variables and polyserial correlations between numeric and ordinal variables. --> High correlation between sumTU and maxTU in September. State variable has no high correlation with any other variable in both months.
+
+For July, sumTU and maxTU both remain in the dataset and further variable selection will be based on forward selection. For September, only maxTU will remain in the dataset.According to (@Schafer.2013), there is not a great difference between the results of sumTU and maxTU, but in agricultural regions, the toxic effects are mainly driven by a single compound and therefor, maxTU will remain in the dataset although it seems like in this dataset, maxTU and sumTU are so highly correlated, the selection of either one of the variables would not make a big difference.
+
+```{r remove-sumtu-from-september}
+cast_envi[[2]][["sumTU"]] <- NULL
+```
 
 ## Permutation tests in CCA, forwards selection and parsimonious CCA 
 pp. 205 Numerical Ecology with R
 
-Test for significans of CCA results by permutations
+Test for significance of CCA results by permutations
 ```{r permutation-test-of-cca-results}
 # Permutation test of the overall analysis
 lapply(cca_list, function(x) {anova(x, step = 1000)})
@@ -1123,7 +1032,7 @@ for (i in 1:length(cast_ge_cca)) {
 July: cast_ge_cca[[i]] ~ ortho_phosphat + oxygen 
 is the most parsimonious model.
 
-September: cast_ge_cca[[i]] ~ ortho_phosphat + conductivity + TOC 
+September: cast_ge_cca[[i]] ~ ortho_phosphat + conductivity + TOC (+pH)
 
 ```{r parsimonious-cca}
 # July
@@ -1131,16 +1040,15 @@ dia_cca_pars_07 <- cca(cast_ge_cca[["07"]] ~ ortho_phosphat + oxygen, cast_envi[
 dia_cca_pars_07
 
 # September
-dia_cca_pars_09 <- cca(cast_ge_cca[["09"]] ~ ortho_phosphat + + conductivity + TOC, cast_envi[["09"]])
+dia_cca_pars_09 <- cca(cast_ge_cca[["09"]] ~ ortho_phosphat + + conductivity + TOC + pH, cast_envi[["09"]])
 dia_cca_pars_09
 
 # Bind both CCAs to one list
 cca_list_pars <- list (dia_cca_pars_07, dia_cca_pars_09)
 
 # Summary of both CCAs
-lapply(cca_list_pars, function(x) summary())
+lapply(cca_list_pars, function(x) summary(x))
 # Last element: Find out position of state variables in plot to known which x belongs to which state.
-
 
 # Permutation test of the overall analysis
 lapply(cca_list_pars, function(x) {anova(x, step = 1000)})
@@ -1152,6 +1060,23 @@ The explained (i.e. constrained) inertia of the July CCA was 18.53 % and of the 
 
 The parsimonious CCA for July and September were both highly significant (p = 0.001)
 The permutation test for each axis indicated that both axes of the July CCA were significant (p = 0.002 and 0.003). The permutation test for the September CCA indicates that the first 2 axes were significant ( p = 0.001 and 0.007). 
+
+# Has to be rerfined for it to work!
+```{r plot-labels}
+# Biplots with species names
+dianame_long_cca <- lapply(cast_ge_cca, function(x) colnames(x))
+
+# dianame_m_ge <- lapply(cast_months_ge, function(x) make.cepnames(names(x)))
+stems_ge_cca <- lapply(cast_ge_cca, colSums)
+
+for (i in 1:length(dianame_long_cca)) {
+  plot(cca_list_pars[[i]]) #red crosses = species, dots = sites
+  orditorp(cca_list_pars[[i]], dis="sp", lab=dianame_long_cca[[i]], priority=stems_ge_cca[[i]],
+           pcol="red", pch="+")
+}
+
+```
+
 
 ```{r plot-parsimonious-CCA}
 windows()
