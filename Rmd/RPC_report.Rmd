@@ -1,0 +1,101 @@
+---
+title: "RPC Report"
+author: "Gesa Amelung"
+date: "27 April 2018"
+output: pdf_document
+bibliography: rpc_lit.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, include = FALSE)
+```
+
+```{r load-packages}
+require(png)
+
+```
+
+
+# Introduction
+- periphytic diatom communities
+- importance of diatoms in monitoring, why are they so useful? + example 
+ Hill et al8:biological indicators rare used, normally more physchem cparameters
+- relation of diatom communities to environmental parameters especially herbicides
+- main determinants of diatom community structure may not only be pesticides but also fertilizers (dorigo, liess, in morina  bottina 2009
+- toxicity of herbicides to diatoms + examples
+
+Changes in the communty of diatoms in response to several environmental factors have been well studied. Thereby, changes in diatom community structure can be taken as a proxy for environmental pollution with e.g. nutrients. However, the response of the diatom community to pesticides has not been well studied so far. Especially the response to herbicides is of special concern since they are the type of herbicides that are most toxic to diatoms.
+
+Changes in the communty of benthic diatoms in response to several environmental factors have been well studied (EXAMPLES). Thereby, changes in diatom community structure can be taken as a proxy for environmental pollution with e.g. nutrients. Diatoms are such valuable indicators since they are easy to collect, respond quickly to changes in the water chemistry and habitat quality, are taxonomically very diverse and have short regeneration times [@Round.1991], [@vanDam.1994], [@Leland.1995]. In contrast to measured environmental concentrations which represent a stream's condition at a certain point in time, the diatom communities reveal the impacts of past events/conditions/pollution inputs.  However, in order to relate the diatom community compostion to a pollution, the response of certain diatoms to certain environmental conditions has to be known. Several monitoring tools already exist describing the response to nutrient pollution such as the diatom biological indx (DBI), the Rott saprobic index (ROT), the trophic diatom indexes (TDI), the Sladecek index (SLA), the eutrophication pollution index (EPI) and the European index (CEE) [@LENOIR.1996].--> debenest The ROT and the SLA are relevant to detect organic pollution whereas the DBI, the TDI, the EPI and the CEE are more sensitive to trophic pollution.
+
+
+
+
+However, little is known about the (degree of) impact of herbicides on the community composition.
+
+
+
+In this study, monitoring data from lotic waterbodies in Germany from the years 2005 - 2014 was used to perform Correspondance Analysis (CA). With ordination via CA, the main trend of variation can be visualized. With subsequent Canonical Correspondance Analysis (CCA), this trend can be connected to environmental descriptors. Those environmental descriptors are represented by a dataset of physical-chemical data and herbicide data sampled in lotic waterbodies of Germany as well.
+
+# Methods
+
+The diatom dataset and the environmental parameter dataset both result from monitorings of the single German states. Monitoring data of the years 2005 - 2014 were used. Two diatom datasets were created, one for the CA and one for the CCA. Of the latter, only data remained from sites were EC~50~ data was available. As a measure of abundance, the diatom cover was used. All data of which no cover data was available were removed from the diatom dataset. During the ten years, monitoring was performed with a varying sampling intensity.
+
+```{r sampling-year-plot}
+#readPNG(system.file("img","figures/samples_year.png", package="png"))
+#img1 <- readPNG("figures/samples_year.png")
+#png(filename = "Rplot%03d.png",
+#    width = 480, height = 480, units = "px", pointsize = 12,
+#     bg = "white",  res = NA, ...,
+#    type = c("cairo", "cairo-png", "Xlib", "quartz"), antialias)
+
+#png(filename = "figures/samples_year.png", bg = "transparent")
+
+```
+
+## Diatom sampling
+
+The diatoms were sampled in flowing waters throughout Germany. Samples were collected by the University of Duisburg-Essen according to [@Schaumburg.2012].  Briefly, the epilithon from the top of the stones was scratched off and collected. All organic cell components were removed via oxidation with strong acids for a reliable identification. Permanent microscope slides were prepared which enable identification even after decades. Finally, diatoms were identified to species or even variety level. Only benthic pennate taxa without an obligatory planctonic way of life were considered.
+
+## Seasonality
+
+Diatom communities follow a seasonal succession which might be more prominent than the interanual succession. [@Hausmann.2007] showed that for lakes, the spring and summer conditions had a strong impact on the diatom composition and productivity which was stronger than the impact of changing annual mean temperatures. Similarly, [@Kirilova.2008] observed a seasonal succession of diatoms in lakes. The predominant diatoms in winter and spring were of the genus *Stephanodiscus* while species of the genera *Stephanodiscus*, *Fragilaria*, and *Nitzschia* were the most abundant diatoms in summer and autumn. To account for this seasonal variability of diatom composition, it seemed reasonable to summarize the diatom data for each month over all years. The number of diatom samples taken varied throughout the year and were highest in the summer. In order to compare the diatom community composition of the beginning of the summer with the end of the summer, two representative months with a relatively high number of samples were taken for all further analyses, i.e. July and September. Even though May, being the main period of herbicide spring crop treatments, would have been worth investigating in terms of diatom community composition, it was not possible to take the May data for CA or CCA analyses since the number of samples was too low in that month [@Debenest.2007]. 
+
+## Taxonomic resolution
+
+CA analysis was, for test purposes, performed for species and genus diatom data. As the cumulative explained variance of the species data was much lower than of the genus data, even when considering several CA axes, it seemed more reasonable to use only diatom data on the genus level for further analyses. Also, according to [@Rimet.2012], analysis with a taxonomic resolution of genus performs as well as a resolution of species level in many cases. Similarly, [@Larras.2014] found that diatom sensitivity to herbicides can be attributed to their phylogeny. They reported that centric and araphid diatoms (Thalassiosirales and Fragilariales, respectively) were most sensitive to the herbicides whereas pennates (Cymbellales, Naviculales and Bacillariales) were more robust. Hence, analysis of the diatom data on the genus level should be sufficient to detect the main trends of response to environmental variables.
+
+## Taxon frequency
+
+[@Marchant.2002] suggests to remove rare species as only common species produce information that can reliably be linked to present environmental gradients. [@Cao.2001] suggests the removal of rare species if samples were taken over a large spatial scale which holds true for the present dataset. Furthermore, Chi-square distance, the distance measure used in CA and CCA, gives more weight to rare species. Due to this reason, [@Legendre.2012] suggest to remove rare species from the analysis. Here, species that occur in less than 5 % of the samples were removed as was also done by [@Fernandez.2016].
+
+## Gradient length
+
+A Detrended Correspondance Analysis (DCA) was performed in order to decide whether it is appropriate to conduct a unimodal gradient method (e.g. CA and CCA). DCA was introduced by (@Hill.1980). If the length of the first DCA axis, scaled in units of standard deviations (S.D.), is > 4 S.D. a complete species turnover can be assumed and a unimodal gradient method is appropriate to use. A linear gradient method would be more appropriate for a length of the first axes < 3 S.D., indicating an incomplete change of species composition. For an axis length between 3 and 4, both types of methods are appropriate to use (@Leps.2003). As the length of the first axis of the CA and the CCA diatom dataset was > 4 S.D. in all months, a unimodal gradient could be assumed.
+
+## Ordination
+
+### CA
+
+Correspondance Analysis (CA) was used to determine the major trends of variation of the diatom community before including any environmental data. CA is an ordination method and hence reduces data of multidimensional space to a 2- or 3-dimensional representation with minimal loss of information. The dimensions included in the ordination plot are the ones with the highest amount of variance and thus display the greatest part of variability of the data. By using weighted averages ordination, sites and species are ordered at the same time into the same space. The distance measure used is Pearson's chi-squared distance which has the advantage of excluding "double zeros". In the resulting ordination plot, similar communities and species are close together while dissimilar communities and species are further apart. The species' optimum and occurence is highest at its respective point in the ordination diagram and its frequency decreases with increasing distance to that point [@Legendre.2012]. 
+
+### CCA
+
+As CA is only an indirect gradient analysis not taking into account any explainatory variables, Canonical Correspondance Analysis (CCA) was used in a further step to relate the community composition to environmental variables. CCA is a canonical ordination method developed by [@TerBraak.1986]. In a CCA ordination plot, only those response variables are displayed that have a high relation to linear combinations of the explanatory variables. Also, species are ordered along the canonical axes accoring to their ecological optima. DCA, CA and CCA were run using the R package 'vegan' [@Oksanen.2017].
+
+## Selection of environmental variables
+
+To compare the toxicity of herbicides in the different streams, toxic units (TU) were calculated from measured concentrations and acute (48-96 hour) EC~50~ values.
+
+From algae 48-96 hour EC~50~ values, toxic units were calculated via:
+$$TU = log10(ci/EC50i) $$ 
+
+where TU is the toxic unit of the herbicide *i*, c~i~ is the measured concentration (µg/L) of the respective herbicide and EC~50~ is the respective EC~50~ (48-96 hours) of an algae species exposed to the herbicide *i* (µg/L). For each site, the sum of the TUs (sumTU) and the maxiumum TU (maxTU) were calculated. 
+
+The following environmental variables of the sites were included in the study: sumTU, maxTU, agriculture, state, temperature, pH, conductivity, oxygen, TOC, total nitrogen, o-phosphate-p and ortho-phosphate. A preliminary CCA was conducted to relate the environmental variables to the diatom genera composition of the sites. Pearson product-moment correlations between numeric variables and polyserial correlations between numeric and ordinal variables were calculated. Variables were selected based on correlation coefficients. This was done using the package 'polycor' [@Fox.2016]. Step-wise forward selection was computed to further reduce environmental variables. With the resulting model, a parsimonious CCA was conducted. The CCA results were then tested for significance by permutations.
+
+# Results & Discussion
+
+# Conclusion
+
+# References
