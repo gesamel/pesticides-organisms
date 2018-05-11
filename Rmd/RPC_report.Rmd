@@ -17,7 +17,7 @@ require(png)
 
 
 # Introduction
-- periphytic diatom communities
+- periphytic diatom communities ---> ecosystem function
 - importance of diatoms in monitoring, why are they so useful? + example 
  Hill et al8:biological indicators rare used, normally more physchem cparameters
 - relation of diatom communities to environmental parameters especially herbicides
@@ -26,14 +26,14 @@ require(png)
 
 Changes in the communty of diatoms in response to several environmental factors have been well studied. Thereby, changes in diatom community structure can be taken as a proxy for environmental pollution with e.g. nutrients. However, the response of the diatom community to pesticides has not been well studied so far. Especially the response to herbicides is of special concern since they are the type of herbicides that are most toxic to diatoms.
 
-Changes in the communty of benthic diatoms in response to several environmental factors have been well studied (EXAMPLES). Thereby, changes in diatom community structure can be taken as a proxy for environmental pollution with e.g. nutrients. Diatoms are such valuable indicators since they are easy to collect, respond quickly to changes in the water chemistry and habitat quality, are taxonomically very diverse and have short regeneration times [@Round.1991], [@vanDam.1994], [@Leland.1995]. In contrast to measured environmental concentrations which represent a stream's condition at a certain point in time, the diatom communities reveal the impacts of past events/conditions/pollution inputs.  However, in order to relate the diatom community compostion to a pollution, the response of certain diatoms to certain environmental conditions has to be known. Several monitoring tools already exist describing the response to nutrient pollution such as the diatom biological indx (DBI), the Rott saprobic index (ROT), the trophic diatom indexes (TDI), the Sladecek index (SLA), the eutrophication pollution index (EPI) and the European index (CEE) [@LENOIR.1996].--> debenest The ROT and the SLA are relevant to detect organic pollution whereas the DBI, the TDI, the EPI and the CEE are more sensitive to trophic pollution.
+Changes in the communty of benthic diatoms in response to several environmental factors have been well studied (EXAMPLES). Thereby, changes in diatom community structure can be taken as a proxy for environmental pollution with e.g. nutrients. Diatoms are such valuable indicators since they are easy to collect, respond quickly to changes in the water chemistry and habitat quality, are taxonomically very diverse and have short regeneration times [@Round.1991], [@vanDam.1994], [@Leland.1995]. In contrast to measured environmental concentrations which represent a stream's condition at a certain point in time, the diatom communities are indicators for changing environmental conditions. This is especially valuable for the monitoring of pesticide inputs. Peak concentrations of pesticides can have a greater impact on the ecology than average concentrations. However, the sampling frequency of river monitoring is oftentimes too low to detect such peak concentrations resulting from short-term input events [@Stehle.2013]. Hence, the diatom community  assemblage can be used to detect past concentrations of pesticides. However, in order to relate the diatom community compostion to a pollution, the response of certain diatoms to certain environmental conditions has to be known. Some monitoring tools already exist describing the response of diatoms pesticide pollution such as the PICT (pollution-induced community tolerance) or the PAM (pulse-amplitude modulated)  [@Blanck.1988, @Blanck.2010, @McClellan.2008, @Dorigo.2001, @SchmittJansen.2008, @Schreiber.2007].However, these tools are so far only applicable on a restricited number of pesticides, mainly photosystem II inhibitors. 
+
+--> Moreover, environmental parameters, like light exposure and nutrient concentration may interfere with the response of these tools to pesticide exposure (Guasch et al., 1997, 1998; Berard and Benninghoff, 2001). --> see Debenest
 
 
+--> Überleitung zu RPC thema --> However, little is known about the (degree of) impact of herbicides on the community composition and on interference with other environmental parameters
 
-
-However, little is known about the (degree of) impact of herbicides on the community composition.
-
-
+Phytobenthos or diatoms?? Which one should I use?
 
 In this study, monitoring data from lotic waterbodies in Germany from the years 2005 - 2014 was used to perform Correspondance Analysis (CA). With ordination via CA, the main trend of variation can be visualized. With subsequent Canonical Correspondance Analysis (CCA), this trend can be connected to environmental descriptors. Those environmental descriptors are represented by a dataset of physical-chemical data and herbicide data sampled in lotic waterbodies of Germany as well.
 
@@ -94,7 +94,7 @@ where TU is the toxic unit of the herbicide *i*, c~i~ is the measured concentrat
 
 The following environmental variables of the sites were included in the study: sumTU, maxTU, agriculture, state, temperature, pH, conductivity, oxygen, TOC, total nitrogen, o-phosphate-p and ortho-phosphate. A preliminary CCA was conducted to relate the environmental variables to the diatom genera composition of the sites. Pearson product-moment correlations between numeric variables and polyserial correlations between numeric and ordinal variables were calculated. Variables were selected based on correlation coefficients. This was done using the package 'polycor' [@Fox.2016]. Step-wise forward selection was computed to further reduce environmental variables. With the resulting model, a parsimonious CCA was conducted. The CCA results were then tested for significance by permutations.
 
-# Results & Discussion
+# Results and Discussion
 
 # Conclusion
 
