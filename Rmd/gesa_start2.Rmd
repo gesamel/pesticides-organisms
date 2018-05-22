@@ -1091,3 +1091,39 @@ identify(plot_cca_pars_09, what="species")  # manually assign which species shou
 savePlot(filename="figures/plot_cca_pars_09", type="png")
 # dev.off() # R session terminates when using this command. Do it manually instead.
 ```
+
+### Data inspection
+Range of environmental parameters
+```{r range-envi}
+#gives range of list element 1 column 3
+range(cast_envi[[1]][[2]])
+  
+# in a nested loop
+
+for (i in 1:length(cast_envi)) {
+  for(j in 1:ncol(cast_envi[[i]]))
+    ran[i]<-range(cast_envi[[i]][[j]])
+    print(ran[i])
+  }
+  
+
+ran <- 0
+for (i in 1:length(cast_envi)) {
+  for(j in 1:11){
+    ran[j]<-range(cast_envi[[i]][[j]])
+    print(ran[j])
+  }
+}
+
+ran = lapply(cast_envi, function(y) sapply(1:11, function(x) range(unlist(y) ==x)))
+
+unlist(lapply(cast_envi[[1]], is.numeric))  #works
+lapply(cast_envi, function(x) unlist(lapply(cast_envi[[i]], is.numeric))) # works
+
+# if true: range
+# if false: skip it
+
+# continue here: https://www.r-bloggers.com/a-tutorial-on-loops-in-r-usage-and-alternatives/
+
+```
+
