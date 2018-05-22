@@ -29,6 +29,7 @@ require(vegan)
 require(ggplot2)
 require(gridExtra)
 require(stringr)
+require(polycor)
 
 ## switch
 online = FALSE
@@ -831,11 +832,19 @@ phch_list
 ```
 
 
+Save and read in final environmental dataset before casting to wide format
+```{r}
+# saveRDS(phch_sam, file.path('cache', 'phch_sam_final.rds'))
+phch_sam <- readRDS(file.path('cache', 'phch_sam_final.rds'))
+
+```
+
+
 Join phch_sam on dia_sam_cca by site_id to exclude all samples that were not taken at a diatom sampling site.
 
 Also join dia_sam_cca on phch_sam by site_id to exclude all diatom samples were no phys-chem parameters were taken. --> does not need to be performed
 ```{r}
-phch_sam <- semi_join(phch_sam, dia_sam_cca, by =c("site_id","month"))
+#phch_sam <- semi_join(phch_sam, dia_sam_cca, by =c("site_id","month"))
 ```
 
 How many negative values are in value_fin? 
@@ -845,8 +854,14 @@ phch_sam[phch_sam$value_fin<0 ,] # Many maxTU (and sumTU?) values are below zero
 nrow(phch_sam[phch_sam$value_fin==0 ,]) # 260
 ```
 
+How many zero values are in envi dataset?
+```{r}
+nrow(phch_sam[phch_sam$value_fin==0 ,]) # 260
+head(phch_sam[phch_sam$value_fin==0 ,])
+# Parameters were below detection limit if final value is zero.
+```
 
-Aggregate environmental data over all years for July and September. Then, transform form long to wide format.
+Aggregate environmental data over all years for July and September. Then, transform/cast form long to wide format.
 ```{r cast-envi, echo=TRUE, message=FALSE}
 phch_sam_aggr <- phch_sam %>% 
   group_by(month, name, site_id) %>%
@@ -858,7 +873,8 @@ phch_sam_aggr <- phch_sam %>%
 # Store single months as seperate elements of a list
 phch_sam_list <- split(phch_sam_aggr, phch_sam_aggr$month)
 
-cast_envi <- lapply(phch_sam_list, function(x) dcast(x, site_id ~ name, value.var="perc95", fill = 0))
+#cast_envi <- lapply(phch_sam_list, function(x) dcast(x, site_id ~ name, value.var="perc95", fill = 0))
+cast_envi <- lapply(phch_sam_list, function(x) dcast(x, site_id ~ name, value.var="perc95", fill = NA))
 
 # Take the first column and store it as a rowname, afterwards, delete the first column.
 cast_envi  <- lapply(cast_envi ,
@@ -867,8 +883,9 @@ cast_envi  <- lapply(cast_envi ,
                                    x })
 
 # Remove rows where the row sum is zero.
-cast_envi  <- lapply(cast_envi ,
-       function(x) { x[rowSums(x) != 0,] })
+#cast_envi <- lapply(cast_envi ,
+#       function(x) { x[rowSums(x) != 0,] })
+# Do not use since it messes up table and does not apply to any row anyways
 
 ```
 
@@ -931,12 +948,73 @@ unique(cast_envi[[2]][["state"]])
 # Does not work, empty output
 ```
 
-Save final datasets
+How many missing values are in each variable?
+```{r}
+length(cast_envi[[1]][[1]]) # 122 rows in total
+
+#lapply(cast_envi, function(a) sapply(a,is.na))
+sapply(cast_envi[[1]], function(x) sum(is.na(x)))
+sapply(cast_envi[[2]], function(x) sum(is.na(x)))
+```
+Most values are missing in agriculture and ortho_phosphate. As these are quite collinear anyways, I will remove them.
+
+```{r remove-rare-variables}
+cast_envi <- lapply(cast_envi, function(x) x[,-1])  # remove agriculture
+cast_envi <- lapply(cast_envi, function(x) x[,-4]) # remove ortho_phosphate
+```
+
+load cca data
+```{r load-cca-data}
+cast_ge_cca <- readRDS(file.path('cache', 'dia_ge_final.rds'))
+```
+
+Remove all rows that contain NAs in envi dataset
+And delete removed sites from diatom dataset
+```{r rows-with-NAs}
+sum(complete.cases(cast_envi[["07"]])) # only 12 rows of 122 with no missing data
+# when removing agriculture and ortho_phosphate prior to CCA, 65 rows are left
+
+sum(complete.cases(cast_envi[["09"]])) # only 26 of 127 rows with no missing data
+# when removing agriculture and ortho_phosphate prior to CCA, 87 rows are left
+
+# Remove all rows that contain NAs
+cast_envi <- lapply(cast_envi, function(x) {x[complete.cases(x), ]})
+
+# Also delete rows of sites in cast_ge_cca dataset that do not exist anymore in cast_envi
+site_envi_07 <- rownames(cast_envi[[1]])
+site_envi_09 <- rownames(cast_envi[[2]])
+
+cast_ge_cca[[1]] <- (cast_ge_cca[[1]][site_envi_07,])
+cast_ge_cca[[2]] <- (cast_ge_cca[[2]][site_envi_09,])
+
+#cast_ge_cca_07 <- cast_ge_cca[[1]]
+#cast_ge_cca_09 <- cast_ge_cca[[2]]
+# just for better inspection
+
+```
+
+
+Load/save final datasets
 ```{r save-final-psm-datasets}
 #saveRDS(cast_envi, file.path('cache', 'psm_final.rds'))
 cast_envi <- readRDS(file.path('cache', 'psm_final.rds'))
 
-cast_ge_cca <- readRDS(file.path('cache', 'dia_ge_final.rds'))
+#cast_ge_cca <- readRDS(file.path('cache', 'dia_ge_final.rds'))
+```
+
+###  Collinearity
+```{r}
+# Correlation between numeric and categorical variables
+hetcor(cast_envi[["07"]], ML = FALSE, std.err = TRUE, bins=4, pd=TRUE)
+hetcor(cast_envi[["09"]], ML = FALSE, std.err = TRUE, bins=4, pd=TRUE)
+# Calculation of correlation with state variable does not work anymore for september dataset
+```
+July: no highly correlated variables
+September: sumTU and maxTU highly correlated
+
+sumTU was removed from the September dataset.
+```{r remove-collinear-variables}
+cast_envi[[2]][["sumTU"]] <- NULL
 ```
 
 ### CCA with all variables 
@@ -944,16 +1022,19 @@ cast_ge_cca <- readRDS(file.path('cache', 'dia_ge_final.rds'))
 ## July
 names(cast_envi[["07"]])
 
-dia_cca_07 <- cca(cast_ge_cca[["07"]] ~ agriculture + conductivity + maxTU + o_phosphat_p + ortho_phosphat + oxygen + pH + sumTU + temperature + TOC + tot_N + state, cast_envi[["07"]])
+dia_cca_07 <- cca(cast_ge_cca[["07"]] ~  conductivity + maxTU + o_phosphat_p  + oxygen + pH + sumTU + temperature + TOC + tot_N + state, cast_envi[["07"]], na.action=na.omit)
 dia_cca_07
+# na.exclude --> probably  the number of predictor variables (constraints) is higher than the number of remaining observations. 
+# na.omit --> works but 110 deleted observations and 3 deleted species
 
 # Plot
 windows()
 plot_cca_07 <- plot(dia_cca_07, main = "CCA July")
-savePlot(filename="figures/plot_cca_07", type="png")
+savePlot(filename="figures/plot_cca_07", type="png")  # window has to be open in order to save
 
 ## September
-dia_cca_09 <- cca(cast_ge_cca[["09"]] ~ agriculture + conductivity + maxTU + o_phosphat_p + ortho_phosphat + oxygen + pH + sumTU + temperature + TOC + tot_N + state, cast_envi[["09"]])
+names(cast_envi[["09"]])
+dia_cca_09 <- cca(cast_ge_cca[["09"]] ~ conductivity + maxTU + o_phosphat_p + + oxygen + pH + sumTU + temperature + TOC + tot_N + state, cast_envi[["09"]], na.action=na.omit)
 dia_cca_09
 
 # Plot
@@ -982,11 +1063,7 @@ With state variable: explained intertia of July CCA is 18.53 % (17.46 ??) and of
 ```{r vif}
 lapply(cca_list, function(x) vif.cca(x))
 #lapply(cca_list_pars, function(x) vif.cca(x))
-
-# Correlation between numeric and categorical variables
-hetcor(cast_envi[["07"]], ML = FALSE, std.err = TRUE, bins=4, pd=TRUE)
-hetcor(cast_envi[["09"]], ML = FALSE, std.err = TRUE, bins=4, pd=TRUE)
-
+# not meaningful for categorical variables
 ```
 VIF = 1 (Not correlated)
 1 < VIF < 5 (Moderately correlated)
@@ -994,16 +1071,10 @@ VIF >=5 (Highly correlated)
 
 
 State variable has high VIFs -> method not appropriate for categorical variables 
-September: maxTU and sumTu have very high VIFs.
-July: SumTU and maxTU have VIFs of 4.525703 and 4.518743, respectively, which is still okay. All other VIFs are below 4.
 
 Calculation of Pearson product-moment correlations between numeric variables and polyserial correlations between numeric and ordinal variables. --> High correlation between sumTU and maxTU in September. State variable has no high correlation with any other variable in both months.
 
 For July, sumTU and maxTU both remain in the dataset and further variable selection will be based on forward selection. For September, only maxTU will remain in the dataset.According to (@Schafer.2013), there is not a great difference between the results of sumTU and maxTU, but in agricultural regions, the toxic effects are mainly driven by a single compound and therefor, maxTU will remain in the dataset although it seems like in this dataset, maxTU and sumTU are so highly correlated, the selection of either one of the variables would not make a big difference.
-
-```{r remove-sumtu-from-september}
-cast_envi[[2]][["sumTU"]] <- NULL
-```
 
 ## Permutation tests in CCA, forwards selection and parsimonious CCA 
 pp. 205 Numerical Ecology with R
@@ -1014,33 +1085,42 @@ Test for significance of CCA results by permutations
 lapply(cca_list, function(x) {anova(x, step = 1000)})
 
 # Permutation test of each axis
-lapply(cca_list, function(x) {anova(x, by="axis", step = 1000)})
+lapply(cca_list, function(x) {anova(x, by="axis", step = 1000)})   # does not work when rows with NAs are not excluded in dataset.
 ```
-The permutation test of the overall analysis indicates a significant model for the month Jula (p = 0.019) and a very significant model for the month September (p = 0.01).
+The permutation test of the overall analysis indicates a significant model for the month July (p = 0.019) and a very significant model for the month September (p = 0.01).
 
 The permutation test for each axis indicates a significant first axis (p = 0.024) for July. For the CCA for September, also only the first axis was significant (p = 0.019).
 
 --> Exact values will change every time because different steps wil be performed, model is compared to different random models.
+
+
+---- With reduced dataset, na.omit: ----
+July: p = 0.079 --> no significant model
+September: p = 0.001
+
+significance of single axes:
+July: No axis significant
+September: First two axes significant
 
 ### Forward selection of variables
 ```{r forward-selection}
 for (i in 1:length(cast_ge_cca)) {
   ordistep(cca(cast_ge_cca[[i]]~1, data = cast_envi[[i]]), scope = formula(cca_list[[i]]), direction = "forward", pstep = 1000)
 }
-
 ```
-July: cast_ge_cca[[i]] ~ ortho_phosphat + oxygen 
+
+July: cast_ge_cca[[i]] ~ pH + o_phosphat_p + conductivity  
 is the most parsimonious model.
 
-September: cast_ge_cca[[i]] ~ ortho_phosphat + conductivity + TOC (+pH)
+September: cast_ge_cca[[i]] ~ pH + tot_N + temperature + conductivity
 
 ```{r parsimonious-cca}
 # July
-dia_cca_pars_07 <- cca(cast_ge_cca[["07"]] ~ ortho_phosphat + oxygen, cast_envi[["07"]])
+dia_cca_pars_07 <- cca(cast_ge_cca[["07"]] ~ pH + o_phosphat_p + conductivity , cast_envi[["07"]])
 dia_cca_pars_07
 
 # September
-dia_cca_pars_09 <- cca(cast_ge_cca[["09"]] ~ ortho_phosphat + + conductivity + TOC + pH, cast_envi[["09"]])
+dia_cca_pars_09 <- cca(cast_ge_cca[["09"]] ~ pH + tot_N + temperature + conductivity, cast_envi[["09"]])
 dia_cca_pars_09
 
 # Bind both CCAs to one list
@@ -1081,7 +1161,7 @@ for (i in 1:length(dianame_long_cca)) {
 ```{r plot-parsimonious-CCA}
 windows()
 plot_cca_pars_07 <-plot(dia_cca_pars_07, main = "parsimonious CCA July")
-identify(plot_cca_pars_07, what="species")  # manually assign which species should be shown
+#identify(plot_cca_pars_07, what="species")  # manually assign which species should be shown
 #identify(plot_cca_pars_07, what="sites")    # sites
 savePlot(filename="figures/plot_cca_pars_07", type="png")
 
@@ -1089,41 +1169,23 @@ plot_cca_pars_09 <-plot(dia_cca_pars_09, main = "parsimonious CCA September")
 identify(plot_cca_pars_09, what="species")  # manually assign which species should be shown
 #identify(plot_cca_pars_09, what="sites")    # sites
 savePlot(filename="figures/plot_cca_pars_09", type="png")
+# [1] 14 21 34 38 41 points of species that are names in triplot
 # dev.off() # R session terminates when using this command. Do it manually instead.
 ```
 
 ### Data inspection
 Range of environmental parameters
 ```{r range-envi}
-#gives range of list element 1 column 3
-range(cast_envi[[1]][[2]])
-  
 # in a nested loop
-
-for (i in 1:length(cast_envi)) {
-  for(j in 1:ncol(cast_envi[[i]]))
-    ran[i]<-range(cast_envi[[i]][[j]])
-    print(ran[i])
-  }
-  
-
-ran <- 0
-for (i in 1:length(cast_envi)) {
-  for(j in 1:11){
-    ran[j]<-range(cast_envi[[i]][[j]])
-    print(ran[j])
-  }
-}
-
-ran = lapply(cast_envi, function(y) sapply(1:11, function(x) range(unlist(y) ==x)))
-
-unlist(lapply(cast_envi[[1]], is.numeric))  #works
-lapply(cast_envi, function(x) unlist(lapply(cast_envi[[i]], is.numeric))) # works
-
-# if true: range
-# if false: skip it
-
-# continue here: https://www.r-bloggers.com/a-tutorial-on-loops-in-r-usage-and-alternatives/
+lapply(cast_envi, function(a) sapply(a[sapply(a,is.numeric)],range))
 
 ```
+
+```{r}
+# make two seperate dataframes from list
+cast_envi_07 <- cast_envi[[1]]
+cast_envi_09 <- cast_envi[[2]]
+
+```
+
 
