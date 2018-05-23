@@ -971,6 +971,7 @@ cast_ge_cca <- readRDS(file.path('cache', 'dia_ge_final.rds'))
 Remove all rows that contain NAs in envi dataset
 And delete removed sites from diatom dataset
 ```{r rows-with-NAs}
+lapply(cast_envi, nrow)
 sum(complete.cases(cast_envi[["07"]])) # only 12 rows of 122 with no missing data
 # when removing agriculture and ortho_phosphate prior to CCA, 65 rows are left
 
@@ -987,8 +988,12 @@ site_envi_09 <- rownames(cast_envi[[2]])
 cast_ge_cca[[1]] <- (cast_ge_cca[[1]][site_envi_07,])
 cast_ge_cca[[2]] <- (cast_ge_cca[[2]][site_envi_09,])
 
-#cast_ge_cca_07 <- cast_ge_cca[[1]]
-#cast_ge_cca_09 <- cast_ge_cca[[2]]
+#Make two seperate dataframes from lists
+cast_ge_cca_07 <- cast_ge_cca[[1]]
+cast_ge_cca_09 <- cast_ge_cca[[2]]
+
+cast_envi_07 <- cast_envi[[1]]
+cast_envi_09 <- cast_envi[[2]]
 # just for better inspection
 
 ```
@@ -999,18 +1004,18 @@ Load/save final datasets
 #saveRDS(cast_envi, file.path('cache', 'psm_final.rds'))
 cast_envi <- readRDS(file.path('cache', 'psm_final.rds'))
 
-#cast_ge_cca <- readRDS(file.path('cache', 'dia_ge_final.rds'))
 ```
 
 ###  Collinearity
+I set r > 0.7 as a threshold for collinearity (Dorman et al. 2013)
 ```{r}
 # Correlation between numeric and categorical variables
 hetcor(cast_envi[["07"]], ML = FALSE, std.err = TRUE, bins=4, pd=TRUE)
 hetcor(cast_envi[["09"]], ML = FALSE, std.err = TRUE, bins=4, pd=TRUE)
 # Calculation of correlation with state variable does not work anymore for september dataset
 ```
-July: no highly correlated variables
-September: sumTU and maxTU highly correlated
+July: no highly correlated variables (with r > 0.7)
+September: sumTU and maxTU highly correlated (r = 1)
 
 sumTU was removed from the September dataset.
 ```{r remove-collinear-variables}
