@@ -245,6 +245,9 @@ dia_sam_cca <- semi_join(dia_sam, phch_sam[phch_sam$psm==TRUE & !phch_sam$value_
 In most cases, diatom cover was measured instead of abundance. Therefore, rows where abundance was measured were deleted. Instead, the cover data is used as the quantitative variable in the following analyses. The deletion of irrelevant rows was performed for the datasets for CA and CCA seperately.
 
 ```{r delete-abundance-data, echo=TRUE, message=FALSE}
+nrow(dia_sam[!is.na(dia_sam$cover), ])
+nrow(dia_sam[!is.na(dia_sam$cover), ])/nrow(dia_sam)*100 # % of data that have cover as endpoint
+
 dia_sam <- dia_sam[!is.na(dia_sam$cover), ]
 dia_sam <- dia_sam[,-6]    #delete column with abundance data
 
@@ -399,7 +402,9 @@ Removal of rare taxa
 ## Rare = taxa that occur at less than 5 % of the samples
 sampleN = length(unique(dia_sam$id_pn))
 n_sp <- length(unique(dia_sam$species))
+n_sp
 n_ge <- length(unique(dia_sam$genus))
+n_ge
 
 ## Rare genera
 dia_sam_ge = dia_sam %>%
@@ -409,9 +414,9 @@ dia_sam_ge = dia_sam %>%
   filter(perc >= 0.05)
 
 # precentage of genera remaining after removal of rare genera
-n_ge_abu <-length(unique(dia_sam_ge$genus)) #44
+n_ge_abu <-length(unique(dia_sam_ge$genus)) #45
 n_ge_abu
-n_ge_abu/n_ge*100 # 57.1 %
+n_ge_abu/n_ge*100 # 59.21 %
 
 # Plot
 dia_sam_N_ge = dia_sam_ge %>%
@@ -428,9 +433,9 @@ dia_sam_sp = dia_sam %>%
   filter(perc >= 0.05)
 
 # precentage of genera remaining after removal of rare genera
-n_sp_abu <-length(unique(dia_sam_sp$species)) # 153
+n_sp_abu <-length(unique(dia_sam_sp$species)) # 152
 n_sp_abu
-n_sp_abu/n_sp*100 # 17.7 %
+n_sp_abu/n_sp*100 # 19.87 %
 
 # Plot
 dia_sam_N_sp = dia_sam_sp %>%
@@ -450,9 +455,9 @@ dia_sam_ge_cca = dia_sam_cca %>%
   filter(perc >= 0.05)
 
 # precentage of genera remaining after removal of rare genera
-n_ge_abu_cca <-length(unique(dia_sam_ge_cca$genus)) #43
+n_ge_abu_cca <-length(unique(dia_sam_ge_cca$genus)) #41
 n_ge_abu_cca
-n_ge_abu_cca/n_ge_cca*100 # 59.7 %
+n_ge_abu_cca/n_ge_cca*100 # 66.12 %
 
 # Plot
 dia_sam_N_ge_cca = dia_sam_ge_cca %>%
@@ -620,7 +625,7 @@ lapply(cast_ge_cca, function(x) {decorana(x)})
 lapply(cast_ge_cca, function(x) {plot(decorana(x), display="both")})
 ```
 
-For genus data for the cca, the length of the first axis is > 4 S.D. in all months and therefore, a unimodal gradient can be assumed for all months.
+For genus data for the cca, the length of the first axis is > 3 S.D. in both months and therefore, a unimodal gradient can be assumed.
 
 ## CA
 
@@ -951,10 +956,20 @@ unique(cast_envi[[2]][["state"]])
 How many missing values are in each variable?
 ```{r}
 length(cast_envi[[1]][[1]]) # 122 rows in total
+length(cast_envi[[2]][[1]]) # 127 rows in total ??
 
 #lapply(cast_envi, function(a) sapply(a,is.na))
 sapply(cast_envi[[1]], function(x) sum(is.na(x)))
 sapply(cast_envi[[2]], function(x) sum(is.na(x)))
+# July
+100/122*100 # 82 % agriculture data missing
+90/122*100  # 74 % of o-phosphate-p data missing
+
+# September
+89/127*100 # 70 % agriculture data missing
+58/127*100 # 45 % of o-phosphate-p data missing
+
+
 ```
 Most values are missing in agriculture and ortho_phosphate. As these are quite collinear anyways, I will remove them.
 
