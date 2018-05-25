@@ -260,6 +260,9 @@ dia_sam_cca <- dia_sam_cca[,-6]
 Sampling days and sampling events per year.
 
 ```{r sampling-days-per-year, echo=TRUE, message=FALSE}
+# Theme settings
+theme_set(theme_grey(base_size = 20))
+
 ## Number of samples
 
 # Count number of samples per month and year
@@ -314,6 +317,8 @@ gg4 <- ggplot(event_count_y, aes(x=year, y = N)) +
   labs(title="events per year", x = "year", y = "event counts")
 
 grid.arrange(gg3, gg4, ncol=2)
+gg3 # + theme_grey(base_size = 18) 
+ggsave(gg3, width = 10, height = 10, filename = "figures/n_year.png")
 
 # number of samples per month
 gg5 <- ggplot(dia_sam, aes(x=month)) +
@@ -348,7 +353,7 @@ gg09 <- ggplot(dia_sam[dia_sam$month=="09",], aes(x=day)) +
   ylim(0, 1750) +
   labs(title="diatom samples per day - September", x = "day", y = "number of samples")
 
-gg7 <- grid.arrange(gg07, gg08, gg09, ncol=3)
+gg7 <- grid.arrange(gg07, gg09, ncol=2)
 ggsave(gg7, width = 22, height = 10, filename = "figures/n_july_sept.png")
 
 ```
@@ -446,6 +451,7 @@ plot(density(dia_sam_N_sp$N), main="Species density")
 ## Rare genera of dia_sam_cca dataset
 sampleN_cca = length(unique(dia_sam_cca$id_pn))
 n_ge_cca <- length(unique(dia_sam_cca$genus))
+n_ge_cca # 62
 
 ## Rare genera
 dia_sam_ge_cca = dia_sam_cca %>%
@@ -467,17 +473,38 @@ plot(density(dia_sam_N_ge_cca$N), main="Genus density")
 
 ```
 
+Most abundant genera in CA and CCA dataset
+```{r abundant-genera}
+# CA dataset
+dia_ge_list <- dia_sam_ge %>%
+  select(genus) %>%
+  group_by(genus) %>%
+  summarise(total = n()) %>%
+  arrange(desc(total))
+
+# CCA dataset
+dia_ge_list_cca <- dia_sam_ge_cca %>%
+  select(genus) %>%
+  group_by(genus) %>%
+  summarise(total = n()) %>%
+  arrange(desc(total))
+
+```
+
+
 ```{r explore diatom-data}
 # min and max values of cover
 range(dia_sam_ge$cover)
+range(dia_sam_ge_cca$cover)
 # count cases for each cover class
 cov <- table(unlist(dia_sam_ge$cover))
 # barplot of the cover distribution
 barplot(cov, las=1, xlab ="cover class", ylab="frequency")
 # Number of zero cover
 sum(dia_sam_ge$cover==0)
+sum(dia_sam_ge_cca$cover==0)
 
-# Species occurences: Numver of sampling dates where each species is present
+# Species occurences: Number of sampling dates where each species is present
 
 
 #--> continue with numerical ecology with R
@@ -594,11 +621,32 @@ cast_ge_cca <- lapply(cast_ge_cca,
 ```
 
 ```{r save-final-psm-datasets}
+#saveRDS(cast_ge, file.path('cache', 'dia_ge_ca_final.rds'))
+cast_ge <- readRDS(file.path('cache', 'dia_ge_ca_final.rds'))
 
 #saveRDS(cast_ge_cca, file.path('cache', 'dia_ge_final.rds'))
 cast_ge_cca <- readRDS(file.path('cache', 'dia_ge_final.rds'))
                          
 ```
+
+Most abundant genera and sites in July and September
+```{r abundant-genera-per-month}
+# CA dataset
+gen_sum <- as.data.frame(sapply(cast_ge, function(x) colSums(x != 0)))
+
+# CCA dataset
+gen_sum_cca <- as.data.frame(sapply(cast_ge_cca, function(x) colSums(x != 0)))
+
+```
+
+```{r abundance-sites-per-month}
+as.data.frame(rowSums(cast_ge[[1]] != 0))
+as.data.frame(rowSums(cast_ge[[2]] != 0))
+
+as.data.frame(rowSums(cast_ge_cca[[1]] != 0))
+as.data.frame(rowSums(cast_ge_cca[[2]] != 0))
+```
+
 
 ### DCA
 
@@ -666,6 +714,7 @@ ca_ge <-lapply(cast_ge, function(x) {cca(x)})
 lapply(ca_ge, function(x) {summary(x)})
 ```
 
+
 ```{r  plot-ca-genus, echo=TRUE, message=FALSE}
 # Compute biplots without names
 lapply(cast_ge, function(x) {plot(cca(x), scaling=2)})
@@ -682,6 +731,32 @@ for (i in 1:length(dianame_long_ge)) {
            pcol="red", pch="+")
 }
 
+stems <- colSums(BCI)
+plot(mod, dis="sp", type="n")
+sel <- orditorp(mod, dis="sp", lab=shnam, priority=stems, pcol = "gray", pch="+")
+
+# Plot July
+windows()
+plot(ca_ge[[1]], dis="sp", type="n",  xlim = c(-7.5,1), ylim = c(-4,2))
+sel_07 <- orditorp(ca_ge[[1]], dis="sp", lab=dianame_long_ge[[1]], priority=stems_ge[[1]], pcol = "red", pch="+")
+sel_07[1:45] # which genera are included in biplot
+
+savePlot(filename="figures/plot_ca_07", type="png") 
+savePlot(filename="figures/plot_ca_07", type="jpeg") 
+writeJPEG(image, target = raw(), quality = 0.7, bg = "white", color.space)
+
+# Plot September
+plot(ca_ge[[2]], dis="sp", type="n", xlim = c(-6.5,1), ylim = c(-2,2))
+sel_09 <- orditorp(ca_ge[[2]], dis="sp", lab=dianame_long_ge[[2]], priority=stems_ge[[2]], pcol = "red", pch="+")
+sel_09[1:45] # which genera are included in biplot
+
+savePlot(filename="figures/plot_ca_09", type="png")
+
+# Identify site and species names manually
+#theme_set(theme_grey(base_size = 5))
+#plot_ca_09 <-plot(ca_ge[[2]], main = "CA September", scaling = 2)
+#identify(plot_ca_09, what="species")  # manually assign which species should be shown
+#identify(plot_ca_09, what="sites")    # sites
 ```
 
 Does not work yet
@@ -703,6 +778,7 @@ for (i in 1:3) {
   dev.off()
 }
 ```
+
 
 ## Environmental data
 
@@ -840,7 +916,7 @@ phch_list
 Save and read in final environmental dataset before casting to wide format
 ```{r}
 # saveRDS(phch_sam, file.path('cache', 'phch_sam_final.rds'))
-phch_sam <- readRDS(file.path('cache', 'phch_sam_final.rds'))
+phch_sam <- readRDS(file.path('cache', 'phch_sam_final.rds')) #11425 observations
 
 ```
 
@@ -1149,6 +1225,7 @@ cca_list_pars <- list (dia_cca_pars_07, dia_cca_pars_09)
 # Summary of both CCAs
 lapply(cca_list_pars, function(x) summary(x))
 # Last element: Find out position of state variables in plot to known which x belongs to which state.
+# -> Biplot scores for constraining variables
 
 # Permutation test of the overall analysis
 lapply(cca_list_pars, function(x) {anova(x, step = 1000)})
