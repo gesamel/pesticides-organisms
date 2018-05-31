@@ -1,0 +1,169 @@
+---
+title: "RPC Report"
+author: "Gesa Amelung"
+date: "27 April 2018"
+output:
+  pdf_document:
+    fig_width: 3
+    fig_height: 2
+    fig_caption: true
+bibliography: rpc_lit.bib
+---
+
+```{r setup, include=FALSE}
+#knitr::opts_chunk$set(echo = TRUE, include = FALSE, eval=TRUE)
+```
+
+```{r load-packages, eval=TRUE, echo = FALSE, include = FALSE}
+require(png)
+require(knitr)
+require(vegan)
+```
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+# Introduction
+
+Changes in the community of benthic diatoms in response to several environmental factors have been well studied. Thereby, changes in diatom community structure can be taken as a proxy for environmental pollution with e.g. nutrients and organic pollution. Taking diatoms for this purpose is meaningful because they are the basis of the food chain and are oftentimes the main remaining primary producers in rivers when rapid flow excludes other algae [@Ghosh.1998]. In the oceans, they are contributing 40 % of the primary production and globally, they contribute about 20 % of the carbon fixation [@Nelson.1995; @Hildebrand.2008]. Characteristic to the eukariyotic and unicellular diatoms is their species-specific siliceous and ornately shaped cell wall, called frustule. The frustule consists of two distinctive valves and girdle bands around the circumference of the cell. Classification of diatoms is based on their frustule structures and more than some thousands of species have been classified so far [@Gordon.1994]. Diatoms are such valuable indicators because they have a variety of advantages over other organisms. Diatoms (i) are easy to collect via e.g. scrubbing of sediment surfaces, (ii) respond quickly to changes in the water chemistry and habitat quality, (iii) are taxonomically very diverse, (iv) have short regeneration times  and (v) are more sensitive to nutrient and organic matter contamination than other organisms such as fishes, macroinvertebrates and macrophytes which are more sensitive to hydrological changes [@Hill.2011; @Round.1991; @vanDam.1994; @Hering.2006]. Further, (vi) different diatom species respond distinctly to environmental conditions and herbicides which makes individual species useful indicators for certain conditions. Hence, diatom communities are valuable indicators for changing environmental conditions whereas measured environmental concentration only represent a stream's condition at a certain point in time. This is especially benefitial for the monitoring of pesticide inputs. Peak concentrations of pesticides can have a greater impact on the ecology than average concentrations. However, the sampling frequency of river monitoring is oftentimes too low to detect such peak concentrations resulting from short-term input events [@Stehle.2013]. Hence, the diatom community  assemblage can be used to overcome the problem of highly fluctuating pesticide concentrations and can detect past pesticide inputs. However, in order to relate the diatom community composition to pollution, the response of different diatom species to certain environmental conditions has to be known. Due to their phytotoxic properties, especially herbicides pose a risk to benthic diatoms [@Akerblom.2004]. This has been demonstratedin several laboratory studies. @Magnusson.2008 observed a reduction in growth rate and photosynthesis at environmentally relevant concentrations of photosystem II (PSII)-inhibiting diuron. Similarly, @Roubeix.2011 found that several benthic diatom species isolated from rivers were sensitive towards diuron. Consistently, @Larras.2012 showed that at usual environmental concentrations diatoms could be affected by herbicides, especially by hte PSII-inhibitors isoproturon, terbutryn, and diuron. Also, some monitoring tools already exist describing the response of diatoms pesticide pollution such as the PICT (pollution-induced community tolerance) or the PAM (pulse-amplitude modulated) [@Blanck.1988; @Blanck.2010; @McClellan.2008; @Dorigo.2001; @SchmittJansen.2008; @Schreiber.2007]. However, these tools are so far only applicable on a restricted number of pesticides, mainly PSII-inhibitors. Further, the effect of pesticides still needs to be disentangled from the effect of environmental parameters such as light exposure and nutrient concentrations [@Guasch.1997; @Guasch.1998; @Berard.2001]. Hence, this study focused on determining the relative importance of the environmental stressors with regard to diatom communities. Several physico-chemical parameters as well as herbicides were included in the analysis. This rather explorative analysis attempts to answer the question if the exposure to herbicides is high enough to be the main determining factor for the presence of certain diatoms or if other environmental variables conceal the herbicide's effects.
+
+In this study, monitoring data of the German federal states from lotic waterbodies from the years 2005 - 2014 were used consisting of physico-chemical parameters, herbicide concentrations as well as benthic diatom data. As there was a great variety of herbicides present at the different sites, not the concentrations itself but Toxic Units (TU) were used to account for the mixture of herbicides present. With the data, a Correspondence Analysis (CA) was performed to visualize the main trend of variation of the diatom communities across sampling sites. The aim of subsequent Canonical Correspondence Analysis (CCA) was to explain the diatom community composition with the measured environmental descriptors.
+
+# Methods
+
+## Sampling sites and times
+
+The diatom dataset and the environmental parameter dataset both result from monitorings of the German federal states. Monitoring data of the years 2005 - 2014 were used. Two diatom datasets were created, one for the CA and one for the CCA. Of the latter, only data remained from sites where EC~50~ data was available. As a measure of abundance, the percentage of diatom cover was used as this was the most commonly assessed endpoint (> 90 % of relevant data). All data of which no cover data was available were removed from the diatom dataset. 
+
+## Diatom sampling
+
+The diatoms were sampled in rivers throughout Germany. Samples were collected seperately by the German federal states [@Schaumburg.2012].  Briefly, the epilithon from the top of the stones was scratched off and collected. All organic cell components were removed via oxidation with strong acids for a reliable identification. Permanent microscope slides were prepared which enable identification even after decades. Finally, diatoms were identified to species or even variety level. Only benthic pennate taxa without an obligatory planctonic way of life were considered.  During the ten years of monitoring, sampling was performed with a varying intensity (figure \ref{fig:n_my}). Here, every occurence of a diatom taxa per sampling event was counted as one seperate sample.
+
+\begin{figure}[htbp!]
+\centering
+\includegraphics[width=12cm, height=10cm]{objects/n_my.png}
+\caption{Diatom sampling intensity per month and year\label{fig:n_my}}
+\end{figure}
+
+## Seasonality
+
+Diatom communities follow a seasonal succession which might be more prominent than the interannual succession. @Hausmann.2007 demonstrated that for lakes, the spring and summer conditions had a strong impact on the diatom composition and productivity which was higher than the impact of changing annual mean temperatures. Similarly, @Kirilova.2008 observed a seasonal succession of diatoms in lakes. The predominant diatoms in winter and spring were of the genus *Stephanodiscus* while species of the genera *Stephanodiscus*, *Fragilaria*, and *Nitzschia* were the most abundant diatoms in summer and autumn. To account for this seasonal variability of diatom composition, it seemed reasonable to summarize the diatom data for each month over all years. The number of diatom samples taken varied throughout the year and were highest in the summer. In order to compare the diatom community composition of the beginning of the summer with the end of the summer, two representative months with a relatively high number of samples were taken for all further analyses, i.e. July and September (figure \ref{fig:n_my}). Even though May, being the main period of herbicide spring crop treatments, would have been worth investigating in terms of diatom community composition, it was not possible to take the May data for CA or CCA analyses since the number of samples was too scarce in that month [@Debenest.2007]. 
+
+## Taxonomic resolution
+
+CA analysis was, for test purposes, performed for species and genus diatom data. As the cumulative explained variance of the species data was much lower than of the genus data, even when considering several CA axes, it seemed more reasonable to use only diatom data on the genus level for further analyses. Also, according to @Rimet.2012, analysis with a taxonomic resolution of genus performs as well as a resolution of species level in many cases. Similarly, @Larras.2014 found that diatom sensitivity to herbicides can be attributed to their phylogeny. They reported that centric and araphid diatoms (*Thalassiosirales* and *Fragilariales*, respectively) were most sensitive to the herbicides whereas pennates (*Cymbellales*, *Naviculales* and *Bacillariales*) were more robust. Hence, analysis of the diatom data on the genus level should be sufficient to detect the main trends of response to herbicides and other environmental variables.
+
+## Taxon frequency
+
+@Marchant.2002 suggests to remove rare species as only common species produce information that can reliably be linked to present environmental gradients. @Cao.2001 suggests the removal of rare species if samples were taken over a large spatial scale which holds true for the present dataset. Furthermore, Chi-square distance, the distance measure used in CA and CCA, gives more weight to rare species. Due to this reason, @Legendre.2012 suggest to remove rare species from the analysis. Here, species that occur in less than 5 % of the samples were removed as was also done by @Fernandez.2016. This resulted in 59 % and  66 % of all genera remaining in the CA and the CCA dataset, respectively.
+
+## Gradient length
+
+A Detrended Correspondence Analysis (DCA) was performed in order to decide whether it is appropriate to conduct a unimodal gradient method (e.g. CA and CCA). DCA was introduced by @Hill.1980. If the length of the first DCA axis, scaled in units of standard deviations (S.D.), is > 4 S.D. a complete species turnover can be assumed and a unimodal gradient method is appropriate to use. A linear gradient method would be more appropriate for a length of the first axes < 3 S.D., indicating an incomplete change of species composition. For an axis length between 3 and 4, both types of methods are appropriate to use [@Leps.2003]. As the length of the first axis of the CA and the CCA diatom dataset was > 4 S.D. in all months, a unimodal gradient could be assumed.
+
+## Ordination
+
+### CA
+
+Correspondence Analysis (CA) was used to determine the major trends of variation of the diatom community before including any environmental data. CA is an ordination method and hence reduces data of multidimensional space to a 2- or 3-dimensional representation with minimal loss of information. The dimensions included in the ordination plot are the ones with the highest amount of variance and thus display the greatest part of variability of the data. By using weighted averages ordination, sites and species are ordered at the same time into the same space. The distance measure used is Pearson's chi-squared distance which has the advantage of excluding "double zeros". In the resulting ordination plot, similar communities and species are close together while dissimilar communities and species are further apart. The species' optimum and occurrence is highest at its respective point in the ordination diagram and its frequency decreases with increasing distance to that point [@Legendre.2012]. 
+
+### CCA
+
+As CA is only an indirect gradient analysis not taking into account any explanatory variables, Canonical Correspondence Analysis (CCA) was used in a further step to relate the community composition to environmental variables. CCA is a canonical ordination method developed by @TerBraak.1986. The proportion of explained variance by the environmental variables is a measure of strength of the relationship between the species assemblage and the environmental variables. Also, species are ordered along the canonical axes according to their ecological optima. All statistical analyses were performed using R 3.4.1 [@RCoreTeam.2018]. DCA, CA and CCA were run using the R package 'vegan' [@Oksanen.2017].
+-> read ter braak for more detailed description
+
+
+## Selection of environmental variables
+
+To compare the toxicity of herbicides in the different streams, toxic units (TU) were calculated from measured concentrations and acute (48-96 hour) EC~50~ values.
+
+From algae 48-96 hour EC~50~ values, toxic units were calculated via:
+
+$$TU = log10(ci/EC50i) $$ 
+
+where TU is the toxic unit of the herbicide *i*, c~i~ is the measured concentration (µg/L) of the respective herbicide and EC~50~ is the respective EC~50~ (48-96 hours) of an algae species exposed to the herbicide *i* (µg/L). For each site, the sum of the TUs (sumTU) and the maximum TUs (maxTU) were calculated. 
+
+The following environmental variables of the sites were included in the study: sumTU, maxTU, agriculture, state, temperature, pH, conductivity, oxygen, TOC, total nitrogen, o-phosphate-p and ortho-phosphate. Before any further analysis, agriculture and o-phosphate-p had to be removed because of large amounts of missing data (74-82 % and 45-70 % missing, respectively CHECK AGAIN IF NUMBERS ARE CORRECT!!). Further, all sites had to be removed where not all considered environmental variables, agriculture and o-phosphate-p excluded, were available. To estimate collinearity between explanatory variables, Pearson product-moment correlations between numeric variables and poly-serial correlations between numeric and ordinal variables were calculated. Pairwise correlation coefficients (r) > 0.7 were assumed to indicate collinearity [@Dormann.2013]. This was done using the R package 'polycor' [@Fox.2016]. The analysis showed that in the September dataset, sumTU was highly correlated with maxTU. As grab samples often show a high number of pesticides below the limit of quantification or even qualification, since pesticide monitoring oftentimes fails to capture short-term exposures [@Stehle.2013], maxTU was assumed to be more appropriate to reflect herbicide exposure than sumTU. Hence, sumTU was omitted from the September dataset. A preliminary CCA was conducted to relate the environmental variables to the diatom genera composition of the sites. Step-wise forward selection with 999 permutations per step was computed to further reduce environmental variables. With the resulting model, a parsimonious CCA was conducted. The CCA results were then tested for significance by permutations with 999 random permutations.
+
+# Results and Discussion
+main determinants of diatom community structure may not only be pesticides but also fertilizers (dorigo, liess, in morina  bottina 2009)
+
+## Species composition and CA results
+
+The diatom dataset for the CCA, in contrast to the dataset for the CA, only included sites at which herbicides were measured. Hence, the species composition between both datasets differed. After removal of rare genera, in both months 45 and 41 genera remained in the CA and the CCA dataset, respectively. In the CA dataset, the most abundant genera were *Navicula*, *Nitzschia* and *Gomphonema* in both months whereas in the CCA dataset, the abundance of the most common genera changed slightly between months. In July, the most abundant genera were *Navicula*, *Nitzschia* and *Cocconeis*, in September the most commonly found genera were *Navicula*, *Gomphonema* and *Nitzschia* leaving *Navicula* and *Nitzschia* the most abundant genera overall. 
+
+CA ordination of the July data showed that 10.2 % of diatom assemblages variance was explained on axis 1, and a further 9.7 % on axis 2 (figure \ref{fig:ca_07}). In the September ordination, the first axis explained 13.56 % of the total variance within the diatom community composition and the second axis explained 9.39 % of the variance (figure \ref{fig:ca_09}).
+
+\begin{figure}[htbp!]
+\centering
+\includegraphics[width=9cm, height=12cm]{objects/plot_ca_07.png}
+\caption{July CA biplot\label{fig:ca_07}}
+\end{figure}
+
+\begin{figure}[htbp!]
+\centering
+\includegraphics[width=9cm, height=12cm]{objects/plot_ca_09.png}
+\caption{September CA biplot\label{fig:ca_09}}
+\end{figure}
+
+The first axis of the July data has an eigenvalue of 0.40 accounting for 10.2 % of the total inertia indicating a relatively strong gradient in the data. The second axis shows a similar gradient (eigenvalue = 0.39) accounting for 9.7 % of the total intertia. Together, the first two axes account for a cummulative proportion of the total inertia of 19.9 %. To examine the number of axes necessary for a meaningful ordination and interpretation, the Kaiser-Guttman criterion and the broken stick model was applied. The former interpretes only those axes whose eigenvalues are larger than the mean of all eigenvalues. Ther broken stick model randomly divides a stick of unit length into the same number of pieces as there are CA axes. The pieces are then put in decreasing order and only those axes are interpreted whose eigenvalues are larger than the length of the corresponding broken stick piece. Here, the first criterion indicated that 13 CA axes would be needed for a meaningful interpretation whereas the second criterion indicated that nine CA axes are needed. Hence, both criterions implicated a much higher number of CA axes than can be visualized in a CA ordiplot. The biplot includes only the most abundant taxa and sites (figure \ref{fig:ca_07}). The first axis has a very high negative correlation with *Eunotia* (species score = -7.2) which is distinctly different from the other genera. *Pinnularia* is also rather strongly related to the first axis (species score = -1.5). *Achnanthes* and *Cymbella* are both relatively strongly correlated to the second CA axis (species scores = -2.0 and -1.8) whereas *Mayamaea* is rather strongly positively correlated to the second axis (species score = 1.1). 
+
+In the September CA, the eigenvalues of the first two axes were more different from each other (eigenvalues = 0.56 and 0.39, respectively). The first axis explained 13.6 % of the total inertia whereas the second axis explained 9.4 %, accumulating to 22.9 %. Applying the Kaiser–Guttman and broken stick plots criterions, 13 CA axes or six CA axes would have to be considered for a meaningful interpretation. Hence, the biplot of the September CA, as well as of the July CA, could not represent the main variability of the diatom data. In the July CA, again, *Eunotia* had a strong negative correlation  with the first CA axis (species score = -6.1) (figure \ref{fig:ca_09} ). Also, *Pinnularia* and *Cymbopleura* were negatively correlated with the first axis (species scores =  -2.8 and -2.0, respectively). Also similarly to the July CA, *Achnanthes* and *Cymbella* were negatively correlated with the second axis (species score = -1.8 and -1.1). In the positive direction, *Adlafia* and *Geissleria* were correlated the highest with the second axis (species score = 1.6 and 1.3, respectively). Therefore, in both months it were the same genera that had the greatest share of the variance within the data. This indicates that the environmental conditions between the two months were rather similar.
+
+According to @Dam.1994, the genera *Eunotia* Ehrenberg is, in contrast to many other genera, found in habitats that are not permanently submerged in the water which might be the crucial factor distinguishing it from other diatoms genera. Further, *Eunotia* was found to be tolerant to the PSII-inhibiting herbicide Atrazine [@Wood.2014]. The genera *Pinnularia*, also correlated with the first axis, is found in a wide range of water types with many species being found in acid, oligotropic habitats [@Dam.1994]. Hence, the first CA axis seemed to relate most to moisture but also to pH and trophic state.
+
+
+## CCA results
+
+Forward selection of the environmental variables indicated that for July, pH, o-phosphat-p and  conductivity accounted significantly (p<0.05) to the total variance within the diatom community composition and where included in the model for the final CCA. For September, pH was again the environmental variable accounting for the greates variance and was kept in the model along with the other significant (p<0.05) variables tot_N, temperature and conductivity.
+
+The first two axes of the CCA biplots of the July and September data are shown in figures \ref{fig:cca_07} and \ref{fig:cca_09}. The arrows indicate the direction of the environmental gradient with their lengths being representative for the strength of the variable.The explained (i.e. constrained) inertia of the July CCA was 11.65 % and 14.84 % of the September CCA. For July, the first axis (eigenvalue = 0.131) explained 5.36 % of the variance in the diatom community composition. The axis was mainly related to pH and o-phosphate-p (table \ref{tab:biplot_07}). The second axis (eigenvalue = 0.967) explained 3.94 % of the variance and was mainly related to pH. As the model was highly significant (p=0.001), each axis was consequently tested for significance indicating that axes 1 and 2 were both had a significant eigenvalue (p<0.05). For September the first axis (eigenvalue = 0.245) explained 7.89 % of the total variance within the diatom community composition whereas the second axis (eigenvalue = 0.112) explained 3.59 % of the total variance. The first axis had the highest correlation with pH, conductivity and temperature and the second axis was mainly correlated with tot_N (table \ref{tab:biplot_09}). The models was also highly significant (p=0.001) in which the first two axes had highly significant eigenvalues (p=0.001) and the third axis a significant eigenvalue (p<0.05).
+
+\begin{figure}[htbp!]
+\centering
+\includegraphics[width=9cm, height=12cm]{objects/plot_cca_pars_07.png}
+\caption{July CCA biplot\label{fig:cca_07}}
+\end{figure}
+
+\begin{figure}[htbp!]
+\centering
+\includegraphics[width=9cm, height=12cm]{objects/plot_cca_pars_09.png}
+\caption{September CCA biplot\label{fig:cca_09}}
+\end{figure}
+
+\begin{table}[h!]
+\centering
+\caption{Biplot scores of July CCA. Scores indicate the correlation of the variable with the respective CCA axis and the position of the variable in the biplot.}
+\label{tab:biplot_07}
+\begin{tabular}{ p{3cm}| p{3cm} p{3cm} p{3cm} }
+\hline \\ [-1.5ex]
+variable & CCA1 & CCA2 & CCA3 \\ [1ex]
+\hline \\ [-1.5ex]
+pH & -0.6311 & -0.7756 & -0.0137 \\ [1ex]
+o-phosphate-p &  0.6279 & -0.3761 & -0.6814 \\ [1ex]
+conductivity & -0.4754 & 0.3085 & -0.8239 \\ [1ex]
+\hline
+\end{tabular}
+\end{table}
+
+
+\begin{table}[h!]
+\centering
+\caption{Biplot scores of September CCA. Scores indicate the correlation of the variable with the respective CCA axis and the position of the variable in the biplot.}
+\label{tab:biplot_09}
+\begin{tabular}{ p{3cm}| p{3cm} p{3cm} p{3cm} p{3cm}}
+\hline \\ [-1.5ex]
+variable & CCA1 & CCA2 & CCA3 & CCA4 \\ [1ex]
+\hline \\ [-1.5ex]
+pH & -0.93171 & 0.02273 & -0.1435 & 0.33289 \\ [1ex]
+tot-N & -0.07104 & 0.89960 & -0.1239 & -0.41270 \\ [1ex]
+temperature & -0.66557 & 0.06374 & 0.7380 & 0.09098 \\ [1ex]
+conductivity & -0.69415 & -0.12679 & 0.1753 & -0.68654 \\ [1ex]
+\hline
+\end{tabular}
+\end{table}
+
+# Conclusion
+
+# References
