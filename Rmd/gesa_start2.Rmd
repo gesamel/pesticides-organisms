@@ -30,6 +30,7 @@ require(ggplot2)
 require(gridExtra)
 require(stringr)
 require(polycor)
+require(lubridate)
 
 ## switch
 online = FALSE
@@ -948,6 +949,16 @@ phch_list <- phch_sam %>%
 phch_list
 ```
 
+Only include measurements taken in the same and the two previous years (total of3 years) of the diatom sample date.
+```{r 3-years}
+# Join on site_id with dia_sam_cca
+# filter(date >= today() — years(1))
+# filter(date >= today() - years(1))
+library(lubridate)
+filter(date >=  - years(2))
+phch_sam$date - years(2)
+```
+
 
 Save and read in final environmental dataset before casting to wide format
 ```{r}
@@ -1128,7 +1139,7 @@ Load/save final datasets
 cast_envi <- readRDS(file.path('cache', 'psm_final.rds'))
 
 #saveRDS(cast_ge_cca, file.path('cache', 'dia_ge_final.rds'))
-cast_ge_cca <- readRDS(file.path('cache', 'psm_final.rds'))
+cast_ge_cca <- readRDS(file.path('cache', 'dia_ge_final.rds'))
 
 ```
 
@@ -1160,8 +1171,11 @@ dia_cca_07
 
 # Plot
 windows()
-plot_cca_07 <- plot(dia_cca_07, main = "CCA July")
+plot_cca_07 <- plot(dia_cca_07)
 savePlot(filename="figures/plot_cca_07", type="png")  # window has to be open in order to save
+# Plot only with species and envi variables, without site names
+plot(dia_cca_07, scaling=2, display=c("species", "cn"))
+savePlot(filename="rmd/objects/plot_cca_07_spenvi", type="png")
 
 ## September
 # sumTU already removed
@@ -1170,12 +1184,16 @@ dia_cca_09 <- cca(cast_ge_cca[["09"]] ~ conductivity + maxTU + o_phosphat_p + + 
 dia_cca_09
 
 # Plot
-plot_cca_09 <- plot(dia_cca_09, main = "CCA September")
+plot_cca_09 <- plot(dia_cca_09)
 savePlot(filename="figures/plot_cca_09", type="png")
-dev.off()
+
+plot(dia_cca_09, scaling=2, display=c("species", "cn"))
+savePlot(filename="rmd/objects/plot_cca_09_spenvi", type="png")
+# dev.off()
 
 
 cca_list <- list(dia_cca_07, dia_cca_09)
+lapply(cca_list, function(x) summary(x))
 
 #the arrow points to the direction
 #of the gradient, and its length indicates the strength of the variable
@@ -1258,6 +1276,7 @@ saveRDS(dia_cca_pars_09, file.path('Rmd/objects', 'dia_cca_pars_09.rds'))
 cca_list_pars <- list (dia_cca_pars_07, dia_cca_pars_09)
 
 # Summary of both CCAs
+# summary(cca_list_pars[[2]])
 lapply(cca_list_pars, function(x) summary(x))
 # Last element: Find out position of state variables in plot to known which x belongs to which state.
 # -> Biplot scores for constraining variables
@@ -1320,15 +1339,24 @@ for (i in 1:length(dianame_long_cca)) {
 
 ```{r plot-parsimonious-CCA}
 windows()
-plot_cca_pars_07 <-plot(dia_cca_pars_07)
+
+# July
+plot(dia_cca_pars_07, scaling=2, display=c("species", "cn"))
+savePlot(filename="rmd/objects/plot_cca_pars_07_spenvi", type="png")
+
+plot(dia_cca_pars_07)
 #identify(plot_cca_pars_07, what="species")  # manually assign which species should be shown
 #identify(plot_cca_pars_07, what="sites")    # sites
 savePlot(filename="figures/plot_cca_pars_07", type="png")
 savePlot(filename="rmd/objects/plot_cca_pars_07", type="png")
 
+# September
+plot(dia_cca_pars_09, scaling=2, display=c("species", "cn"))
+savePlot(filename="rmd/objects/plot_cca_pars_09_spenvi", type="png")
+
 plot_cca_pars_09 <-plot(dia_cca_pars_09)
 identify(plot_cca_pars_09, what="species")  # manually assign which species should be shown
-identify(plot_cca_pars_09, what="sites")    # sites
+#identify(plot_cca_pars_09, what="sites")    # sites
 savePlot(filename="figures/plot_cca_pars_09", type="png")
 savePlot(filename="rmd/objects/plot_cca_pars_09", type="png")
 # dev.off() # R session terminates when using this command. Do it manually instead.
@@ -1338,7 +1366,8 @@ savePlot(filename="rmd/objects/plot_cca_pars_09", type="png")
 Range of environmental parameters
 ```{r range-envi}
 # in a nested loop
-lapply(cast_envi, function(a) sapply(a[sapply(a,is.numeric)],range))
+range_envi <- lapply(cast_envi, function(a) sapply(a[sapply(a,is.numeric)],range))
+range_envi[[1]]
 
 ```
 
